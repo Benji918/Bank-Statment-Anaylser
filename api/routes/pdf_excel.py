@@ -1,5 +1,8 @@
+import io
+
+import requests
 from fastapi import HTTPException, status, UploadFile, File
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from fastapi.routing import APIRouter
 from api.services.pdf_excel import PDFExcelService
 import logging
@@ -27,8 +30,16 @@ async def convert_pdf_to_excel(file: UploadFile = File(...)):
             pdf_service = PDFExcelService(tmp.name)
             access_token = pdf_service.generate_token()
             asset_info = pdf_service.create_asset(access_token)
-            export_info = pdf_service.export_to_excel(asset_info["assetID"], access_token)
-            return export_info
+            download_url = pdf_service.export_to_excel(asset_info["assetID"], access_token)
+
+            response = requests.get(download_url)
+            response.raise_for_status()
+
+            return StreamingResponse(
+                io.BytesIO(response.content),
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": f"attachment; filename={file.filename}.xlsx"}
+            )
 
     except Exception as e:
         logger.error(f"Error converting PDF to Excel: {e}")
