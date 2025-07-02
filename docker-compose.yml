@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: intellibank
+      POSTGRES_USER: intellibank
+      POSTGRES_PASSWORD: intellibank_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U intellibank"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Celery and Caching
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Application
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://intellibank:intellibank_password@postgres:5432/intellibank
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SECRET_KEY=your-secret-key-here
+      - DEBUG=true
+      - ADOBE_CLIENT_ID=your-adobe-client-id
+      - ADOBE_CLIENT_SECRET=your-adobe-client-secret
+      - CLOUDINARY_CLOUD_NAME=your-cloudinary-cloud-name
+      - CLOUDINARY_API_KEY=your-cloudinary-api-key
+      - CLOUDINARY_API_SECRET=your-cloudinary-api-secret
+      - GEMINI_API_KEY=your-gemini-api-key
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Celery Worker
+  celery-worker:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://intellibank:intellibank_password@postgres:5432/intellibank
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SECRET_KEY=your-secret-key-here
+      - ADOBE_CLIENT_ID=your-adobe-client-id
+      - ADOBE_CLIENT_SECRET=your-adobe-client-secret
+      - CLOUDINARY_CLOUD_NAME=your-cloudinary-cloud-name
+      - CLOUDINARY_API_KEY=your-cloudinary-api-key
+      - CLOUDINARY_API_SECRET=your-cloudinary-api-secret
+      - GEMINI_API_KEY=your-gemini-api-key
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: celery -A app.tasks.celery_app worker --loglevel=info --queues=analysis,files,notifications
+
+  # Celery Beat (Scheduler)
+  celery-beat:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://intellibank:intellibank_password@postgres:5432/intellibank
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SECRET_KEY=your-secret-key-here
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+
+  # Celery Flower (Monitoring)
+  celery-flower:
+    build: .
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+    command: celery -A app.tasks.celery_app flower --port=5555
+
+volumes:
+  postgres_data:
+  redis_data:
