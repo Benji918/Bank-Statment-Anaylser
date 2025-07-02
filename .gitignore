@@ -168,9 +168,7 @@ logs/
 *.db
 *.sqlite
 
-# Alembic
-alembic/versions/*.py
-!alembic/versions/__init__.py
+
 
 # Docker
 .dockerignore
