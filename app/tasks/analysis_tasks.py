@@ -95,14 +95,14 @@ def process_statement_analysis(
         )
 
         # Update statement status to failed
-        # try:
-        #     from app.services.statement_service import statement_service
-        #     from app.models.statement import StatementStatus
-        #     statement_service.update_processing_status(
-        #         db, statement_id, StatementStatus.FAILED, str(e)
-        #     )
-        # except:
-        #     pass
+        try:
+            from app.services.statement_service import statement_service
+            from app.models.statement import StatementStatus
+            statement_service.update_processing_status(
+                db, statement_id, StatementStatus.FAILED, str(e)
+            )
+        except:
+            pass
 
         self.update_state(
             state="FAILURE",

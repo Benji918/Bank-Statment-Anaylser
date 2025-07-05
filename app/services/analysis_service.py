@@ -1,8 +1,10 @@
 """Analysis service for managing financial analysis operations"""
-
+from fastapi import HTTPException
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+from starlette import status
+
 from app.models.analysis import Analysis
 from app.models.statement import Statement, StatementStatus
 from app.schemas.analysis import AnalysisCreate, AnalysisListParams
@@ -33,6 +35,8 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
             statement = db.query(Statement).filter(
                 and_(Statement.id == statement_id, Statement.user_id == user_id)
             ).first()
+
+
             
             if not statement:
                 raise ValidationError("Statement not found")
@@ -50,6 +54,7 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
             pdf_content = await file_service.download_from_cloudinary(
                 statement.cloudinary_public_id
             )
+
             
             # Perform AI analysis directly with PDF file
             start_time = datetime.utcnow()
@@ -58,56 +63,61 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
                 statement.original_filename,
                 analysis_type
             )
+
+            if isinstance(analysis_result, dict):
+                try:
+                    analysis_result = json.loads(analysis_result)
+                except json.JSONDecodeError as e:
+                    raise FileProcessingError(f"Invalid JSON response from AI service: {str(e)}")
             end_time = datetime.utcnow()
             
             processing_time = (end_time - start_time).total_seconds()
-            
-            # Extract document info if available
-            document_info = analysis_result.get("document_info", {})
+            print(analysis_result)
+
+            document_info = analysis_result["document_info"]
             
             # Create analysis record
-            analysis = self.create(
-                db,
-                AnalysisCreate(statement_id=statement_id),
+            analysis = Analysis(
+                statement_id=statement_id,
                 user_id=user_id,
                 analysis_type=analysis_type,
-                model_version="gemini-pro-v1",
+                model_version="gemini-2.0-flash",
                 processing_time_seconds=processing_time,
-                
                 # Financial summary
-                total_income=analysis_result["summary"].get("total_income"),
-                total_expenses=analysis_result["summary"].get("total_expenses"),
-                net_cash_flow=analysis_result["summary"].get("net_cash_flow"),
-                opening_balance=document_info.get("opening_balance"),
-                closing_balance=document_info.get("closing_balance"),
-                financial_health_score=analysis_result["summary"].get("financial_health_score"),
-                
+                total_income=analysis_result["summary"]["total_income"],
+                total_expenses=analysis_result["summary"]["total_expenses"],
+                net_cash_flow=analysis_result["summary"]["net_cash_flow"],
+                opening_balance=document_info["opening_balance"],
+                closing_balance=document_info["closing_balance"],
+                financial_health_score=analysis_result["summary"]["financial_health_score"],
                 # Analysis results as JSON
-                transaction_categories=json.dumps(analysis_result.get("transaction_categories", [])),
-                spending_patterns=json.dumps(analysis_result.get("spending_patterns", [])),
-                income_analysis=json.dumps(analysis_result.get("income_analysis", {})),
-                anomalies=json.dumps(analysis_result.get("anomalies", [])),
-                insights=json.dumps(analysis_result.get("insights", [])),
-                recommendations=json.dumps(analysis_result.get("recommendations", [])),
-                risk_assessment=json.dumps(analysis_result.get("risk_assessment", {})),
-                
+                transaction_categories=json.dumps(analysis_result["transaction_categories"]),
+                spending_patterns=json.dumps(analysis_result["spending_patterns"]),
+                income_analysis=json.dumps(analysis_result["income_analysis"]),
+                anomalies=json.dumps(analysis_result["anomalies"]),
+                insights=json.dumps(analysis_result["insights"]),
+                recommendations=json.dumps(analysis_result["recommendations"]),
+                risk_assessment=json.dumps(analysis_result["risk_assessment"]),
                 # Raw data - store the complete analysis result
-                transactions_data=json.dumps(analysis_result.get("cash_flow_analysis", {})),
+                transactions_data=json.dumps(analysis_result["cash_flow_analysis"]),
                 excel_data_summary=json.dumps(document_info),
-                
                 # AI-generated content
                 summary_text=self._generate_summary_text(analysis_result),
-                detailed_analysis=analysis_result.get("detailed_analysis", "")
+                detailed_analysis=analysis_result["detailed_analysis"],
             )
-            
+
+            db.add(analysis)
+            db.commit()
+            db.refresh(analysis)
+
             # Update statement with document info if available
-            if document_info.get("statement_period_start"):
+            if document_info["statement_period_start"]:
                 statement.statement_period_start = document_info["statement_period_start"]
-            if document_info.get("statement_period_end"):
+            if document_info["statement_period_end"]:
                 statement.statement_period_end = document_info["statement_period_end"]
-            if document_info.get("bank_name"):
+            if document_info["bank_name"]:
                 statement.bank_name = document_info["bank_name"]
-            if document_info.get("account_type"):
+            if document_info["account_type"]:
                 statement.account_type = document_info["account_type"]
             
             db.add(statement)
@@ -127,7 +137,7 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
             
             return analysis
             
-        except (ValidationError, FileProcessingError):
+        except (ValidationError, FileProcessingError) as e:
             # Update statement status to failed
             try:
                 from app.services.statement_service import statement_service
@@ -136,7 +146,7 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
                 )
             except:
                 pass
-            raise
+            raise FileProcessingError("Failed to create analysis")
         except Exception as e:
             # Update statement status to failed
             try:
@@ -148,7 +158,10 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
                 pass
             
             self.log_error(e, "create_analysis", statement_id=statement_id)
-            raise FileProcessingError("Failed to create analysis")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create analysis"
+            )
     
     def get_user_analyses(
         self, 

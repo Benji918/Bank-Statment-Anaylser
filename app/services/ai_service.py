@@ -250,31 +250,18 @@ class AIAnalysisService(LoggerMixin):
                         prompt
                     ])
                     
-                    if not response.text:
+                    if not response.json():
                         raise ExternalServiceError("Empty response from Gemini")
                     
                     # Parse JSON response
                     try:
-                        analysis_result = response.text
+                        analysis_result = response.json()
                         print(analysis_result)
                         self.log_operation("analysis_parsing_successful")
                     except json.JSONDecodeError as e:
-                        self.log_error(e, "json_parse_error", response_text=response.text[:500])
-                        # Try to extract JSON from response if it's wrapped in markdown
-                        response_text = response.text.strip()
-                        if response_text.startswith('```json'):
-                            response_text = response_text[7:]
-                        if response_text.endswith('```'):
-                            response_text = response_text[:-3]
-                        
-                        try:
-                            analysis_result = json.loads(response_text.strip())
-                        except json.JSONDecodeError:
-                            # Fallback: create basic analysis
-                            analysis_result = self._create_fallback_analysis(filename)
-                    
-                    # Validate and enhance the analysis
-                    analysis_result = self._validate_and_enhance_analysis(analysis_result, filename)
+                        self.log_error(e, "gemini-response-error", response_text=response.text)
+                        raise ExternalServiceError("Invalid JSON returned from Gemini")
+
                     
                     # Clean up uploaded file from Gemini
                     try:
