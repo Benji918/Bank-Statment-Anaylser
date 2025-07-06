@@ -2,6 +2,13 @@
 
 An intelligent bank statement analysis tool that leverages artificial intelligence to automatically process, categorize, and analyze financial transactions from bank statements. This application provides insights into spending patterns, transaction categorization, and financial analytics.
 
+## UI Demo link
+https://t.co/vo9CV47OjF
+
+## ERD diagram
+
+![](https://github.com/Benji918/Bank-Statment-Anaylser/blob/dev/Untitled.png)
+
 ## Features
 
 - **Automated Transaction Processing**: Upload and process bank statements in various formats
