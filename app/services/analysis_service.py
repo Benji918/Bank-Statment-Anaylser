@@ -4,7 +4,6 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from starlette import status
-
 from app.models.analysis import Analysis
 from app.models.statement import Statement, StatementStatus
 from app.schemas.analysis import AnalysisCreate, AnalysisListParams
@@ -64,19 +63,15 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
                 analysis_type
             )
 
-            if isinstance(analysis_result, dict):
-                try:
-                    analysis_result = json.loads(analysis_result)
-                except json.JSONDecodeError as e:
-                    raise FileProcessingError(f"Invalid JSON response from AI service: {str(e)}")
-            end_time = datetime.utcnow()
-            
+            if not isinstance(analysis_result, dict):
+                raise ValidationError("AI service returned unexpected data type")
+
+
+            end_time = datetime.now()
             processing_time = (end_time - start_time).total_seconds()
-            print(analysis_result)
 
             document_info = analysis_result["document_info"]
-            
-            # Create analysis record
+
             analysis = Analysis(
                 statement_id=statement_id,
                 user_id=user_id,
@@ -110,7 +105,7 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
             db.commit()
             db.refresh(analysis)
 
-            # Update statement with document info if available
+
             if document_info["statement_period_start"]:
                 statement.statement_period_start = document_info["statement_period_start"]
             if document_info["statement_period_end"]:
@@ -122,7 +117,7 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
             
             db.add(statement)
             
-            # Update statement status to completed
+
             statement_service.update_processing_status(
                 db, statement_id, StatementStatus.COMPLETED
             )
@@ -138,8 +133,9 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
             return analysis
             
         except (ValidationError, FileProcessingError) as e:
-            # Update statement status to failed
+
             try:
+                pass
                 from app.services.statement_service import statement_service
                 statement_service.update_processing_status(
                     db, statement_id, StatementStatus.FAILED, str(e)
@@ -148,8 +144,9 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
                 pass
             raise FileProcessingError("Failed to create analysis")
         except Exception as e:
-            # Update statement status to failed
+
             try:
+                pass
                 from app.services.statement_service import statement_service
                 statement_service.update_processing_status(
                     db, statement_id, StatementStatus.FAILED, str(e)

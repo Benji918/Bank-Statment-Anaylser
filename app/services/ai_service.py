@@ -13,6 +13,7 @@ from app.schemas.analysis import (
     TransactionCategory, SpendingPattern, Anomaly, 
     Insight, Recommendation, RiskAssessment
 )
+import json
 
 
 class AIAnalysisService(LoggerMixin):
@@ -214,21 +215,18 @@ class AIAnalysisService(LoggerMixin):
         """Perform comprehensive financial analysis using direct file upload to Gemini"""
         try:
             self.log_operation("ai_analysis_start", filename=filename, analysis_type=analysis_type)
-            
-            # Create temporary file for upload
+
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
                 temp_file.write(file_content)
                 temp_file.flush()
                 
                 try:
-                    # Upload file to Gemini
                     self.log_operation("uploading_file_to_gemini", filename=filename)
                     uploaded_file = self.client.files.upload(
                         file=temp_file.name,
-                        # display_name=f"Bank Statement - {filename}"
+
                     )
-                    
-                    # Wait for file processing
+
                     import time
                     while uploaded_file.state.name == "PROCESSING":
                         self.log_operation("waiting_for_file_processing")
@@ -237,11 +235,10 @@ class AIAnalysisService(LoggerMixin):
                     
                     if uploaded_file.state.name == "FAILED":
                         raise ExternalServiceError("File processing failed in Gemini")
-                    
-                    # Create analysis prompt
+
                     prompt = self._create_analysis_prompt(analysis_type)
                     
-                    # Generate AI analysis with the uploaded file
+
                     self.log_operation("generating_analysis_with_gemini")
                     response = self.client.models.generate_content(
                         model=settings.GEMINI_MODEL,
@@ -249,21 +246,40 @@ class AIAnalysisService(LoggerMixin):
                         uploaded_file,
                         prompt
                     ])
+
+                    if hasattr(response, 'text'):
+                         response_text = response.text
+                    elif hasattr(response, 'candidates') and response.candidates:
+                        response_text = response.candidates[0].content.parts[0].text
+                    else:
+                        raise ExternalServiceError("No text content in Gemini response")
                     
-                    if not response.json():
+                    if not response_text:
                         raise ExternalServiceError("Empty response from Gemini")
-                    
-                    # Parse JSON response
+
+                    # Clean the response text to extract JSON
+                    response_text = response_text.strip()
+
+                    # Remove markdown code blocks if present
+                    if response_text.startswith('```json'):
+                        response_text = response_text[7:]  # Remove ```json
+                    if response_text.startswith('```'):
+                        response_text = response_text[3:]   # Remove ```
+                    if response_text.endswith('```'):
+                        response_text = response_text[:-3]  # Remove trailing ```
+
+
                     try:
-                        analysis_result = response.json()
-                        print(analysis_result)
+                        analysis_result = json.loads(response_text)
+                        # print("Analysis result type:", type(analysis_result))
+                        # print("Analysis result keys:", analysis_result.keys() if isinstance(analysis_result, dict) else "Not a dict")
+                        # print(analysis_result)
                         self.log_operation("analysis_parsing_successful")
                     except json.JSONDecodeError as e:
                         self.log_error(e, "gemini-response-error", response_text=response.text)
                         raise ExternalServiceError("Invalid JSON returned from Gemini")
 
-                    
-                    # Clean up uploaded file from Gemini
+
                     try:
                         self.client.files.delete(name=uploaded_file.name)
                         self.log_operation("gemini_file_cleanup_successful")
@@ -274,7 +290,6 @@ class AIAnalysisService(LoggerMixin):
                     return analysis_result
                     
                 finally:
-                    # Clean up temporary file
                     try:
                         os.unlink(temp_file.name)
                     except Exception as e:
@@ -282,92 +297,93 @@ class AIAnalysisService(LoggerMixin):
                         
         except Exception as e:
             self.log_error(e, "analyze_financial_document", filename=filename)
+            return None
             # Return fallback analysis instead of failing
-            return self._create_fallback_analysis(filename)
+            # return self._create_fallback_analysis(filename)
     
-    def _validate_and_enhance_analysis(self, analysis: Dict[str, Any], filename: str) -> Dict[str, Any]:
-        """Validate and enhance AI analysis results"""
-        try:
-            # Ensure required top-level fields exist
-            required_fields = ["summary", "transaction_categories", "spending_patterns", 
-                             "income_analysis", "anomalies", "insights", "recommendations", 
-                             "risk_assessment"]
-            
-            for field in required_fields:
-                if field not in analysis:
-                    analysis[field] = self._get_default_field_value(field)
-            
-            # Validate summary fields
-            if not isinstance(analysis["summary"], dict):
-                analysis["summary"] = {}
-            
-            summary_defaults = {
-                "total_income": 0.0,
-                "total_expenses": 0.0,
-                "net_cash_flow": 0.0,
-                "transaction_count": 0,
-                "financial_health_score": 50.0
-            }
-            
-            for key, default_value in summary_defaults.items():
-                if key not in analysis["summary"] or analysis["summary"][key] is None:
-                    analysis["summary"][key] = default_value
-            
-            # Ensure financial health score is within valid range
-            health_score = analysis["summary"].get("financial_health_score", 50.0)
-            analysis["summary"]["financial_health_score"] = max(0, min(100, health_score))
-            
-            # Validate arrays
-            array_fields = ["transaction_categories", "spending_patterns", "anomalies", "insights", "recommendations"]
-            for field in array_fields:
-                if not isinstance(analysis[field], list):
-                    analysis[field] = []
-            
-            # Ensure risk assessment exists
-            if not isinstance(analysis["risk_assessment"], dict):
-                health_score = analysis["summary"]["financial_health_score"]
-                analysis["risk_assessment"] = {
-                    "overall_risk": "medium",
-                    "risk_factors": ["Limited analysis data available"],
-                    "risk_score": max(0, min(100, 100 - health_score)),
-                    "financial_stability": "moderate",
-                    "recommendations": ["Upload clearer statement for detailed analysis"]
-                }
-            
-            # Add document info if missing
-            if "document_info" not in analysis:
-                analysis["document_info"] = {
-                    "bank_name": None,
-                    "account_type": None,
-                    "statement_period_start": None,
-                    "statement_period_end": None,
-                    "opening_balance": None,
-                    "closing_balance": None
-                }
-            
-            # Add detailed analysis if missing
-            if "detailed_analysis" not in analysis or not analysis["detailed_analysis"]:
-                analysis["detailed_analysis"] = self._generate_detailed_analysis_text(analysis, filename)
-            
-            return analysis
-            
-        except Exception as e:
-            self.log_error(e, "validate_and_enhance_analysis")
-            return analysis
+    # def _validate_and_enhance_analysis(self, analysis: Dict[str, Any], filename: str) -> Dict[str, Any]:
+    #     """Validate and enhance AI analysis results"""
+    #     try:
+    #         # Ensure required top-level fields exist
+    #         required_fields = ["summary", "transaction_categories", "spending_patterns",
+    #                          "income_analysis", "anomalies", "insights", "recommendations",
+    #                          "risk_assessment"]
+    #
+    #         for field in required_fields:
+    #             if field not in analysis:
+    #                 analysis[field] = self._get_default_field_value(field)
+    #
+    #         # Validate summary fields
+    #         if not isinstance(analysis["summary"], dict):
+    #             analysis["summary"] = {}
+    #
+    #         summary_defaults = {
+    #             "total_income": 0.0,
+    #             "total_expenses": 0.0,
+    #             "net_cash_flow": 0.0,
+    #             "transaction_count": 0,
+    #             "financial_health_score": 50.0
+    #         }
+    #
+    #         for key, default_value in summary_defaults.items():
+    #             if key not in analysis["summary"] or analysis["summary"][key] is None:
+    #                 analysis["summary"][key] = default_value
+    #
+    #         # Ensure financial health score is within valid range
+    #         health_score = analysis["summary"].get("financial_health_score", 50.0)
+    #         analysis["summary"]["financial_health_score"] = max(0, min(100, health_score))
+    #
+    #         # Validate arrays
+    #         array_fields = ["transaction_categories", "spending_patterns", "anomalies", "insights", "recommendations"]
+    #         for field in array_fields:
+    #             if not isinstance(analysis[field], list):
+    #                 analysis[field] = []
+    #
+    #         # Ensure risk assessment exists
+    #         if not isinstance(analysis["risk_assessment"], dict):
+    #             health_score = analysis["summary"]["financial_health_score"]
+    #             analysis["risk_assessment"] = {
+    #                 "overall_risk": "medium",
+    #                 "risk_factors": ["Limited analysis data available"],
+    #                 "risk_score": max(0, min(100, 100 - health_score)),
+    #                 "financial_stability": "moderate",
+    #                 "recommendations": ["Upload clearer statement for detailed analysis"]
+    #             }
+    #
+    #         # Add document info if missing
+    #         if "document_info" not in analysis:
+    #             analysis["document_info"] = {
+    #                 "bank_name": None,
+    #                 "account_type": None,
+    #                 "statement_period_start": None,
+    #                 "statement_period_end": None,
+    #                 "opening_balance": None,
+    #                 "closing_balance": None
+    #             }
+    #
+    #         # Add detailed analysis if missing
+    #         if "detailed_analysis" not in analysis or not analysis["detailed_analysis"]:
+    #             analysis["detailed_analysis"] = self._generate_detailed_analysis_text(analysis, filename)
+    #
+    #         return analysis
+    #
+    #     except Exception as e:
+    #         self.log_error(e, "validate_and_enhance_analysis")
+    #         return analysis
     
-    def _get_default_field_value(self, field: str) -> Any:
-        """Get default value for missing fields"""
-        defaults = {
-            "summary": {"total_income": 0, "total_expenses": 0, "net_cash_flow": 0, "financial_health_score": 50},
-            "transaction_categories": [],
-            "spending_patterns": [],
-            "income_analysis": {"primary_income": 0, "secondary_income": 0, "income_sources": []},
-            "anomalies": [],
-            "insights": [],
-            "recommendations": [],
-            "risk_assessment": {"overall_risk": "medium", "risk_factors": [], "risk_score": 50, "recommendations": []}
-        }
-        return defaults.get(field, {})
+    # def _get_default_field_value(self, field: str) -> Any:
+    #     """Get default value for missing fields"""
+    #     defaults = {
+    #         "summary": {"total_income": 0, "total_expenses": 0, "net_cash_flow": 0, "financial_health_score": 50},
+    #         "transaction_categories": [],
+    #         "spending_patterns": [],
+    #         "income_analysis": {"primary_income": 0, "secondary_income": 0, "income_sources": []},
+    #         "anomalies": [],
+    #         "insights": [],
+    #         "recommendations": [],
+    #         "risk_assessment": {"overall_risk": "medium", "risk_factors": [], "risk_score": 50, "recommendations": []}
+    #     }
+    #     return defaults.get(field, {})
     
     def _generate_detailed_analysis_text(self, analysis: Dict[str, Any], filename: str) -> str:
         """Generate detailed analysis text from structured data"""
@@ -408,90 +424,89 @@ class AIAnalysisService(LoggerMixin):
             self.log_error(e, "_generate_detailed_analysis_text")
             return f"Analysis completed for {filename}. Please review the structured data for detailed insights."
     
-    def _create_fallback_analysis(self, filename: str) -> Dict[str, Any]:
-        """Create basic fallback analysis when AI processing fails"""
-        try:
-            self.log_operation("creating_fallback_analysis", filename=filename)
-            
-            return {
-                "document_info": {
-                    "bank_name": None,
-                    "account_type": None,
-                    "statement_period_start": None,
-                    "statement_period_end": None,
-                    "opening_balance": None,
-                    "closing_balance": None
-                },
-                "summary": {
-                    "total_income": 0.0,
-                    "total_expenses": 0.0,
-                    "net_cash_flow": 0.0,
-                    "transaction_count": 0,
-                    "financial_health_score": 30.0
-                },
-                "transaction_categories": [],
-                "spending_patterns": [],
-                "income_analysis": {
-                    "primary_income": 0.0,
-                    "secondary_income": 0.0,
-                    "income_frequency": "Unknown",
-                    "income_stability": "Unknown",
-                    "income_sources": []
-                },
-                "cash_flow_analysis": {
-                    "average_daily_balance": 0.0,
-                    "lowest_balance": 0.0,
-                    "highest_balance": 0.0,
-                    "balance_volatility": "unknown",
-                    "cash_flow_trend": "unknown"
-                },
-                "anomalies": [],
-                "insights": [
-                    {
-                        "type": "general",
-                        "title": "Analysis Limitation",
-                        "description": "Unable to perform detailed analysis due to processing limitations. Please try uploading a clearer PDF file.",
-                        "impact": "neutral",
-                        "priority": "medium",
-                        "actionable": True,
-                        "supporting_data": "File processing failed"
-                    }
-                ],
-                "recommendations": [
-                    {
-                        "category": "general",
-                        "title": "Improve File Quality",
-                        "description": "Upload a higher quality PDF bank statement for more accurate analysis.",
-                        "potential_savings": None,
-                        "difficulty": "easy",
-                        "timeframe": "immediate",
-                        "priority": "high"
-                    }
-                ],
-                "risk_assessment": {
-                    "overall_risk": "high",
-                    "risk_factors": ["Analysis incomplete due to processing limitations"],
-                    "risk_score": 70.0,
-                    "financial_stability": "unknown",
-                    "recommendations": ["Upload a clearer bank statement", "Ensure PDF is text-based, not scanned image"]
-                },
-                "detailed_analysis": f"Analysis of {filename} could not be completed due to processing limitations. This may be due to poor PDF quality, scanned images instead of text-based PDF, or file corruption. Please try uploading a clearer, text-based PDF bank statement for accurate financial analysis."
-            }
-            
-        except Exception as e:
-            self.log_error(e, "create_fallback_analysis")
-            return {
-                "summary": {"total_income": 0, "total_expenses": 0, "net_cash_flow": 0, "financial_health_score": 0},
-                "transaction_categories": [],
-                "spending_patterns": [],
-                "income_analysis": {"primary_income": 0, "secondary_income": 0, "income_sources": []},
-                "anomalies": [],
-                "insights": [],
-                "recommendations": [],
-                "risk_assessment": {"overall_risk": "high", "risk_factors": ["Analysis failed"], "risk_score": 100, "recommendations": []},
-                "detailed_analysis": "Analysis could not be completed due to processing errors."
-            }
+    # def _create_fallback_analysis(self, filename: str) -> Dict[str, Any]:
+    #     """Create basic fallback analysis when AI processing fails"""
+    #     try:
+    #         self.log_operation("creating_fallback_analysis", filename=filename)
+    #
+    #         return {
+    #             "document_info": {
+    #                 "bank_name": None,
+    #                 "account_type": None,
+    #                 "statement_period_start": None,
+    #                 "statement_period_end": None,
+    #                 "opening_balance": None,
+    #                 "closing_balance": None
+    #             },
+    #             "summary": {
+    #                 "total_income": 0.0,
+    #                 "total_expenses": 0.0,
+    #                 "net_cash_flow": 0.0,
+    #                 "transaction_count": 0,
+    #                 "financial_health_score": 30.0
+    #             },
+    #             "transaction_categories": [],
+    #             "spending_patterns": [],
+    #             "income_analysis": {
+    #                 "primary_income": 0.0,
+    #                 "secondary_income": 0.0,
+    #                 "income_frequency": "Unknown",
+    #                 "income_stability": "Unknown",
+    #                 "income_sources": []
+    #             },
+    #             "cash_flow_analysis": {
+    #                 "average_daily_balance": 0.0,
+    #                 "lowest_balance": 0.0,
+    #                 "highest_balance": 0.0,
+    #                 "balance_volatility": "unknown",
+    #                 "cash_flow_trend": "unknown"
+    #             },
+    #             "anomalies": [],
+    #             "insights": [
+    #                 {
+    #                     "type": "general",
+    #                     "title": "Analysis Limitation",
+    #                     "description": "Unable to perform detailed analysis due to processing limitations. Please try uploading a clearer PDF file.",
+    #                     "impact": "neutral",
+    #                     "priority": "medium",
+    #                     "actionable": True,
+    #                     "supporting_data": "File processing failed"
+    #                 }
+    #             ],
+    #             "recommendations": [
+    #                 {
+    #                     "category": "general",
+    #                     "title": "Improve File Quality",
+    #                     "description": "Upload a higher quality PDF bank statement for more accurate analysis.",
+    #                     "potential_savings": None,
+    #                     "difficulty": "easy",
+    #                     "timeframe": "immediate",
+    #                     "priority": "high"
+    #                 }
+    #             ],
+    #             "risk_assessment": {
+    #                 "overall_risk": "high",
+    #                 "risk_factors": ["Analysis incomplete due to processing limitations"],
+    #                 "risk_score": 70.0,
+    #                 "financial_stability": "unknown",
+    #                 "recommendations": ["Upload a clearer bank statement", "Ensure PDF is text-based, not scanned image"]
+    #             },
+    #             "detailed_analysis": f"Analysis of {filename} could not be completed due to processing limitations. This may be due to poor PDF quality, scanned images instead of text-based PDF, or file corruption. Please try uploading a clearer, text-based PDF bank statement for accurate financial analysis."
+    #         }
+    #
+    #     except Exception as e:
+    #         self.log_error(e, "create_fallback_analysis")
+    #         return {
+    #             "summary": {"total_income": 0, "total_expenses": 0, "net_cash_flow": 0, "financial_health_score": 0},
+    #             "transaction_categories": [],
+    #             "spending_patterns": [],
+    #             "income_analysis": {"primary_income": 0, "secondary_income": 0, "income_sources": []},
+    #             "anomalies": [],
+    #             "insights": [],
+    #             "recommendations": [],
+    #             "risk_assessment": {"overall_risk": "high", "risk_factors": ["Analysis failed"], "risk_score": 100, "recommendations": []},
+    #             "detailed_analysis": "Analysis could not be completed due to processing errors."
+    #         }
 
 
-# Create service instance
 ai_service = AIAnalysisService()
