@@ -3,7 +3,7 @@
 from celery import Celery
 from app.core.config import settings
 
-# Create Celery app
+
 celery_app = Celery(
     "intellibank",
     broker=settings.CELERY_BROKER_URL,
@@ -12,10 +12,10 @@ celery_app = Celery(
         "app.tasks.analysis_tasks",
         "app.tasks.file_tasks",
         "app.tasks.notification_tasks"
+        "app.tasks.export_tasks"
     ]
 )
 
-# Configure Celery
 celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
@@ -34,4 +34,5 @@ celery_app.conf.task_routes = {
     "app.tasks.analysis_tasks.*": {"queue": "analysis"},
     "app.tasks.file_tasks.*": {"queue": "files"},
     "app.tasks.notification_tasks.*": {"queue": "notifications"},
+    "app.tasks.export_tasks.*": {"queue": "exports"},
 }

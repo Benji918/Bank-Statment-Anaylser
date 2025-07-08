@@ -144,7 +144,6 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
