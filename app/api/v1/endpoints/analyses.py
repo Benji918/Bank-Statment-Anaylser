@@ -1,5 +1,5 @@
 """Financial analysis endpoints"""
-
+import json
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
@@ -21,13 +21,12 @@ logger = get_logger(__name__)
 def create_analysis(
     statement_id: int,
     analysis_type: str = "comprehensive",
-    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Create financial analysis for a statement (async processing)"""
     try:
-        # Validate statement exists and belongs to user
+
         from app.services.statement_service import statement_service
         statement = statement_service.get(db, statement_id)
         
@@ -37,7 +36,7 @@ def create_analysis(
                 detail="Statement not found"
             )
         
-        # Queue analysis task
+
         task = process_statement_analysis.delay(
             statement_id, current_user.id, analysis_type
         )
@@ -127,12 +126,12 @@ def get_analyses(
         analyses, total = analysis_service.get_user_analyses(
             db, current_user.id, params
         )
+        print(analyses, total)
         
-        # Convert to response format
+
         analysis_responses = []
         for analysis in analyses:
-            # Parse JSON fields back to objects
-            import json
+
             
             response_data = {
                 "id": analysis.id,
@@ -151,7 +150,7 @@ def get_analyses(
                 "updated_at": analysis.updated_at
             }
             
-            # Parse JSON fields
+
             try:
                 if analysis.transaction_categories:
                     response_data["transaction_categories"] = json.loads(analysis.transaction_categories)
@@ -169,7 +168,7 @@ def get_analyses(
                 pass  # Keep as None if JSON parsing fails
             
             analysis_responses.append(AnalysisResponse(**response_data))
-        
+        print(analysis_responses)
         return PaginatedResponse.create(
             items=analysis_responses,
             total=total,
@@ -180,7 +179,7 @@ def get_analyses(
         logger.error("Failed to get analyses", error=str(e), user_id=current_user.id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve analyses"
+            detail=f"Failed to retrieve analyses {e}"
         )
 
 
@@ -310,13 +309,14 @@ def get_analysis_stats(
     """Get analysis statistics for current user"""
     try:
         stats = analysis_service.get_analysis_stats(db, current_user.id)
+        print(stats)
         return AnalysisStats(**stats)
         
     except Exception as e:
         logger.error("Failed to get analysis stats", error=str(e), user_id=current_user.id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve statistics"
+            detail=f"Failed to retrieve statistics {e}"
         )
 
 

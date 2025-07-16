@@ -9,14 +9,14 @@ from app.models.user import UserRole, SubscriptionTier
 class UserBase(BaseSchema):
     """Base user schema"""
     email: EmailStr
-    first_name: str = Field(..., min_length=1, max_length=100)
-    last_name: str = Field(..., min_length=1, max_length=100)
-    company: Optional[str] = Field(None, max_length=255)
+    first_name: str = Field(..., min_length=1, max_length=100, alias='firstName')
+    last_name: str = Field(..., min_length=1, max_length=100, alias='lastName')
+    company: Optional[str] = Field(None, max_length=255, alias='companyName')
 
 
 class UserCreate(UserBase):
     """User creation schema"""
-    password: str = Field(..., min_length=8, max_length=100)
+    password: str = Field(..., min_length=8, max_length=100, alias='password')
     confirm_password: str
     
     @validator('confirm_password')
@@ -28,10 +28,10 @@ class UserCreate(UserBase):
 
 class UserUpdate(BaseSchema):
     """User update schema"""
-    first_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    last_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    company: Optional[str] = Field(None, max_length=255)
-    phone: Optional[str] = Field(None, max_length=20)
+    first_name: Optional[str] = Field(None, min_length=1, max_length=100, alias='firstName')
+    last_name: Optional[str] = Field(None, min_length=1, max_length=100, alias='lastName')
+    company: Optional[str] = Field(None, max_length=255, alias='companyName')
+    phone: Optional[str] = Field(None, max_length=20, alias='phoneNumber')
 
 
 class UserResponse(UserBase, TimestampMixin):
@@ -66,7 +66,7 @@ class TokenResponse(BaseSchema):
 class PasswordChange(BaseSchema):
     """Password change schema"""
     current_password: str
-    new_password: str = Field(..., min_length=8, max_length=100)
+    new_password: str = Field(..., min_length=8, max_length=100, alias='newPassword')
     confirm_password: str
     
     @validator('confirm_password')

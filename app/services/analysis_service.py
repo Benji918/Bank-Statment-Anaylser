@@ -2,7 +2,7 @@
 from fastapi import HTTPException
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from starlette import status
 from app.models.analysis import Analysis
 from app.models.statement import Statement, StatementStatus
@@ -183,10 +183,10 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
             if params.end_date:
                 query = query.filter(Analysis.created_at <= params.end_date)
             
-            # Get total count
+
             total = query.count()
             
-            # Apply pagination
+
             offset = (params.page - 1) * params.size
             analyses = query.offset(offset).limit(params.size).all()
             
@@ -241,24 +241,60 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
                     "recent_insights_count": 0
                 }
             
-            # Average processing time
+
             avg_processing_time = db.query(
-                db.func.avg(Analysis.processing_time_seconds)
+                func.avg(Analysis.processing_time_seconds)
             ).filter(Analysis.user_id == user_id).scalar() or 0
             
-            # Average financial health score
+
             avg_health_score = db.query(
-                db.func.avg(Analysis.financial_health_score)
+                func.avg(Analysis.financial_health_score)
             ).filter(
                 and_(
                     Analysis.user_id == user_id,
                     Analysis.financial_health_score.isnot(None)
                 )
             ).scalar() or 0
-            
+
+
+            # Get analyses with transaction categories
+            analyses_with_categories = db.query(Analysis.transaction_categories) \
+                .filter(
+                and_(
+                    Analysis.user_id == user_id,
+                    Analysis.transaction_categories.isnot(None)
+                )
+            ).all()
+
+
+            category_totals = {}
+            for (categories_json,) in analyses_with_categories:
+                if categories_json:
+                    try:
+                        categories = json.loads(categories_json)
+                        if isinstance(categories, list):
+                            for category in categories:
+                                if isinstance(category, dict) and 'category' in category:
+                                    cat_name = category['category']
+                                    cat_count = category.get('count', 0)
+
+                                    category_totals[cat_name] = category_totals.get(cat_name, 0) + cat_count
+
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+
+            # Get top 5 categories by transaction count
+            sorted_categories = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)[:5]
+            most_common_categories = [
+                {"category": cat, "count": count}
+                for cat, count in sorted_categories
+            ]
+
+
+
             # Recent insights count (last 30 days)
             from datetime import timedelta
-            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+            thirty_days_ago = datetime.now() - timedelta(days=30)
             recent_insights_count = db.query(Analysis).filter(
                 and_(
                     Analysis.user_id == user_id,
@@ -267,10 +303,10 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
             ).count()
             
             stats = {
-                "total_analyses": total_analyses,
+                "total_analyses": int(total_analyses),
                 "avg_processing_time": round(avg_processing_time, 2),
                 "avg_financial_health_score": round(avg_health_score, 2),
-                "most_common_categories": [],  # Would need to parse JSON data
+                "most_common_categories": most_common_categories,
                 "recent_insights_count": recent_insights_count
             }
             

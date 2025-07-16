@@ -473,7 +473,7 @@ class ExportService(LoggerMixin):
             buffer.seek(0)
             plt.close()
 
-            # Create ReportLab Image
+
             img = Image(buffer, width=6*inch, height=3*inch)
 
             return img

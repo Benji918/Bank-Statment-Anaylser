@@ -9,12 +9,12 @@ from app.schemas.base import BaseSchema
 class ExportRequest(BaseSchema):
     """Export request schema"""
     format: str = Field(..., description="Export format (pdf, csv, excel, json, png)")
-    start_date: Optional[date] = Field(None, description="Start date for filtering")
-    end_date: Optional[date] = Field(None, description="End date for filtering")
-    statement_ids: Optional[List[int]] = Field(None, description="Specific statement IDs to export")
-    analysis_types: Optional[List[str]] = Field(None, description="Types of analysis to include")
-    include_charts: bool = Field(True, description="Whether to include charts in export")
-    template: Optional[str] = Field(None, description="Predefined template to use")
+    start_date: Optional[date] = Field(None, description="Start date for filtering", alias="startDate")
+    end_date: Optional[date] = Field(None, description="End date for filtering", alias='enddate' )
+    statement_ids: Optional[List[int]] = Field(None, description="Specific statement IDs to export", alias="statementIds")
+    analysis_types: Optional[List[str]] = Field(None, description="Types of analysis to include", alias="analysisTypes")
+    include_charts: bool = Field(True, description="Whether to include charts in export", alias="includeCharts")
+    template: Optional[str] = Field(None, description="Predefined template to use", alias="template")
 
     @validator('format')
     def validate_format(cls, v):

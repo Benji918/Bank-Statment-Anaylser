@@ -39,7 +39,8 @@ class Anomaly(BaseSchema):
     description: str
     severity: str  # low, medium, high
     amount: float
-    date: datetime
+    date: Optional[datetime] = None
+    transaction_date: Optional[str] = None
     category: str
     confidence_score: float
 
