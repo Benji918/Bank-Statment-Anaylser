@@ -20,9 +20,9 @@ router = APIRouter()
 logger = get_logger(__name__)
 
 
-@router.post("/upload", response_model=StatementUploadResponse)
+@router.post("/upload", response_model=List[StatementUploadResponse])
 async def upload_statement(
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),
     category: StatementCategory = Form(StatementCategory.PERSONAL),
     bank_name: str = Form(None),
     account_type: str = Form(None),
@@ -31,51 +31,73 @@ async def upload_statement(
     current_user: User = Depends(get_current_active_user)
 ):
     """Upload a new bank statement"""
-    try:
-        # Create statement data
-        statement_data = StatementCreate(
-            category=category,
-            bank_name=bank_name,
-            account_type=account_type,
-            notes=notes
-        )
-        
-        # Upload statement
-        statement = await statement_service.upload_statement(
-            db, file, current_user.id, statement_data
-        )
-        
-        logger.info(
-            "Statement uploaded successfully",
-            statement_id=statement.id,
-            user_id=current_user.id,
-            filename=file.filename
-        )
-        
-        return StatementUploadResponse(
-            statement_id=statement.id,
-            filename=statement.original_filename,
-            file_size=statement.file_size,
-            status=statement.status,
-            message="Statement uploaded successfully"
-        )
-        
-    except (ValidationError, FileProcessingError) as e:
+    responses = []
+
+    for file in files:
+        try:
+            statement_data = StatementCreate(
+                category=category,
+                bank_name=bank_name,
+                account_type=account_type,
+                notes=notes
+            )
+
+            statement = await statement_service.upload_statement(
+                db, file, current_user.id, statement_data
+            )
+
+            logger.info(
+                "Statement uploaded successfully",
+                statement_id=statement.id,
+                user_id=current_user.id,
+                filename=file.filename
+            )
+
+            responses.append(StatementUploadResponse(
+                statement_id=statement.id,
+                filename=statement.original_filename,
+                file_size=statement.file_size,
+                status=statement.status,
+                message="Statement uploaded successfully"
+            ))
+
+        except (ValidationError, FileProcessingError) as e:
+            responses.append(StatementUploadResponse(
+                statement_id=None,
+                filename=file.filename,
+                file_size=0,
+                status="FAILED",
+                message=str(e)
+            ))
+            logger.error(
+                "Statement upload failed",
+                error=str(e),
+                user_id=current_user.id,
+                filename=file.filename
+            )
+
+        except Exception as e:
+            responses.append(StatementUploadResponse(
+                statement_id=None,
+                filename=file.filename,
+                file_size=0,
+                status="FAILED",
+                message="Statement upload failed"
+            ))
+            logger.error(
+                "Statement upload failed",
+                error=str(e),
+                user_id=current_user.id,
+                filename=file.filename
+            )
+
+    if not responses:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="No files were uploaded"
         )
-    except Exception as e:
-        logger.error(
-            "Statement upload failed",
-            error=str(e),
-            user_id=current_user.id,
-            filename=file.filename
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Statement upload failed"
-        )
+
+    return responses
 
 
 @router.get("/", response_model=PaginatedResponse)

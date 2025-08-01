@@ -11,7 +11,7 @@ celery_app = Celery(
     include=[
         "app.tasks.analysis_tasks",
         "app.tasks.file_tasks",
-        "app.tasks.notification_tasks"
+        "app.tasks.notification_tasks",
         "app.tasks.export_tasks"
     ]
 )

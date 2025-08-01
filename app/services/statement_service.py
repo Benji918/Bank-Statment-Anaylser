@@ -26,13 +26,13 @@ class StatementService(BaseService[Statement, StatementCreate, StatementUpdate])
     ) -> Statement:
         """Upload and create new statement record"""
         try:
-            # Validate file
+
             file_service.validate_file(file)
             
-            # Upload to Cloudinary
+
             public_id, secure_url = await file_service.upload_to_cloudinary(file, user_id)
             
-            # Create statement record
+
             statement = self.create(
                 db,
                 statement_data,

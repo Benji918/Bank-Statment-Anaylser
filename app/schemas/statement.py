@@ -10,8 +10,8 @@ from app.models.statement import StatementStatus, StatementCategory
 class StatementBase(BaseSchema):
     """Base statement schema"""
     category: StatementCategory = StatementCategory.PERSONAL
-    bank_name: Optional[str] = Field(None, max_length=100, alias='bankName')
-    account_type: Optional[str] = Field(None, max_length=50, alias='accountType')
+    bank_name: Optional[str] = Field(None, max_length=100, alias='bank_name')
+    account_type: Optional[str] = Field(None, max_length=50, alias='account_type')
     notes: Optional[str] = None
 
 
@@ -23,8 +23,8 @@ class StatementCreate(StatementBase):
 class StatementUpdate(BaseSchema):
     """Statement update schema"""
     category: Optional[StatementCategory] = None
-    bank_name: Optional[str] = Field(None, max_length=100, alias='bankName')
-    account_type: Optional[str] = Field(None, max_length=50, alias='accountType')
+    bank_name: Optional[str] = Field(None, max_length=100, alias='bank_name')
+    account_type: Optional[str] = Field(None, max_length=50, alias='account_type')
     notes: Optional[str] = None
     tags: Optional[List[str]] = None
 

@@ -20,7 +20,7 @@ def process_statement_analysis(
 ):
     """Process financial analysis for a bank statement"""
 
-    # Update task state
+
     self.update_state(
         state="PROGRESS",
         meta={"current": 0, "total": 100, "status": "Starting analysis..."}
@@ -36,7 +36,6 @@ def process_statement_analysis(
             user_id=user_id
         )
 
-        # Update progress
         self.update_state(
             state="PROGRESS",
             meta={"current": 20, "total": 100, "status": "Downloading file..."}
@@ -59,13 +58,13 @@ def process_statement_analysis(
             logger.error(f"Async analysis creation failed: {str(async_error)}")
 
 
-        # Update progress
+
         self.update_state(
             state="PROGRESS",
             meta={"current": 50, "total": 100, "status": "Processing with AI..."}
         )
 
-        # Update progress
+
         self.update_state(
             state="PROGRESS",
             meta={"current": 90, "total": 100, "status": "Finalizing results..."}
@@ -124,7 +123,7 @@ def batch_process_statements(statement_ids: list, user_id: int):
     
     for i, statement_id in enumerate(statement_ids):
         try:
-            # Process each statement
+
             result = process_statement_analysis.delay(statement_id, user_id)
             results.append({
                 "statement_id": statement_id,
@@ -132,7 +131,7 @@ def batch_process_statements(statement_ids: list, user_id: int):
                 "status": "queued"
             })
             
-            # Update progress
+
             current_task.update_state(
                 state="PROGRESS",
                 meta={
@@ -148,6 +147,7 @@ def batch_process_statements(statement_ids: list, user_id: int):
                 "error": str(e),
                 "status": "failed"
             })
+
     
     return {
         "status": "completed",
@@ -192,6 +192,7 @@ def cleanup_failed_analyses():
         
     except Exception as e:
         logger.error(f"Cleanup task failed: {str(e)}")
+
         db.rollback()
         raise
         

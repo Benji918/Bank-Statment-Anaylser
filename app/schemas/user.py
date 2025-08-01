@@ -9,8 +9,8 @@ from app.models.user import UserRole, SubscriptionTier
 class UserBase(BaseSchema):
     """Base user schema"""
     email: EmailStr
-    first_name: str = Field(..., min_length=1, max_length=100, alias='firstName')
-    last_name: str = Field(..., min_length=1, max_length=100, alias='lastName')
+    first_name: str = Field(..., min_length=1, max_length=100, alias='first_name')
+    last_name: str = Field(..., min_length=1, max_length=100, alias='last_name')
     company: Optional[str] = Field(None, max_length=255, alias='companyName')
 
 
@@ -28,8 +28,8 @@ class UserCreate(UserBase):
 
 class UserUpdate(BaseSchema):
     """User update schema"""
-    first_name: Optional[str] = Field(None, min_length=1, max_length=100, alias='firstName')
-    last_name: Optional[str] = Field(None, min_length=1, max_length=100, alias='lastName')
+    first_name: Optional[str] = Field(None, min_length=1, max_length=100, alias='first_name')
+    last_name: Optional[str] = Field(None, min_length=1, max_length=100, alias='last_name')
     company: Optional[str] = Field(None, max_length=255, alias='companyName')
     phone: Optional[str] = Field(None, max_length=20, alias='phoneNumber')
 
@@ -59,7 +59,7 @@ class TokenResponse(BaseSchema):
     """Token response schema"""
     access_token: str
     refresh_token: str
-    token_type: str = "bearer"
+    token_type: str = "Bearer"
     expires_in: int
 
 
