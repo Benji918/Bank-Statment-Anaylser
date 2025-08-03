@@ -44,6 +44,12 @@ jobs:
             set -e
             echo "🔄 Starting deployment..."
             
+            # Install PM2 if not already installed
+            if ! command -v pm2 &> /dev/null; then
+                echo "Installing PM2..."
+                npm install -g pm2
+            fi
+            
             # Check if the directory exists, if not clone repo
             if [ ! -d "~/Bank-Statment-Anaylser" ]; then
               echo "Directory 'Bank-Statment-Anaylser' exists. Cleaning up..."
@@ -88,31 +94,34 @@ jobs:
             alembic upgrade head || { echo "Failed to run Alembic migrations"; exit 1; }
             echo "✓ Database migrations completed"
             
-            echo "Checking for existing uvicorn process..."
-            if pgrep -f "uvicorn app:app" > /dev/null; then
-                echo "Stopping existing uvicorn process..."
-                pkill -f "uvicorn app:app"
-                sleep 5  # Give the process time to shutdown gracefully
-            fi
+             # Stop any existing PM2 process for this app
+            pm2 delete bank-statement-analyzer 2>/dev/null || true
             
-            echo "Starting uvicorn server..."
-            # Start the server and ensure it stays running
-            nohup venv/bin/uvicorn app:app \
+            # Start the application with PM2
+            echo "Starting application with PM2..."
+            pm2 start "$(which uvicorn)" \
+              --name "bank-statement-analyzer" \
+              -- app:app \
               --host 0.0.0.0 \
               --port 8000 \
-              --reload False > uvicorn.log 2>&1 & 
+              --reload False
             
-            # Wait a moment to ensure the server starts
-            sleep 5
+            # Save PM2 process list
+            pm2 save
             
-            # Check if the server is running
-            if pgrep -f "uvicorn app:app" > /dev/null; then
-                echo "✅ Server successfully started at $(date)"
+            # Ensure PM2 starts on system reboot
+            pm2 startup
+            
+            # Check if the application is running
+            if pm2 show bank-statement-analyzer | grep -q "online"; then
+                echo "✅ Application successfully started with PM2 at $(date)"
             else
-                echo "❌ Server failed to start"
-                cat uvicorn.log
+                echo "❌ Application failed to start"
+                pm2 logs bank-statement-analyzer --lines 50
                 exit 1
             fi
+            
+           
             
             
 
