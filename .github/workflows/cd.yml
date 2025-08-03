@@ -20,10 +20,19 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+          
+
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          echo 'Dependencies installed'
+          echo "Dependencies installed"
 
       - name: Deploy To Droplet
         uses: appleboy/ssh-action@v1
@@ -45,8 +54,17 @@ jobs:
             
             # Ensure we're on the right branch
             git fetch origin dev
+            git checkout dev
             git reset --hard origin/dev
              echo "✓ Git changes pulled"
+            
+            # Create or reuse existing environment
+            if [ ! -d "venv" ]; then
+              python3 -m venv venv
+              echo "✓ Virtual environment created"
+            else 
+              echo "✓ Using existing virtual environment"
+            fi
             
             source venv/scripts/activate
             echo "✓ Creating virtual environments"
