@@ -104,7 +104,7 @@ jobs:
             echo "Starting application with PM2..."
             pm2 start venv/bin/python \
               --name "bank-statement-analyzer" \
-              -- -m uvicorn app:app \
+              -- -m uvicorn main:app \
               --host=0.0.0.0 \
               --port=8000 \
            
