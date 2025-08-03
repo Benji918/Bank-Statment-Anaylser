@@ -50,8 +50,8 @@ jobs:
                 npm install -g pm2
             fi
             
-            # Check if the directory exists, if not clone repo
-            if [ -d "~/Bank-Statment-Anaylser" ]; then
+            # Check if the directory exists, 
+            if [ -d "~/Bank-Statment-Anaylser"  ]; then
               echo "Directory 'Bank-Statment-Anaylser' exists. Cleaning up..."
               rm -rf Bank-Statment-Anaylser 
             fi
