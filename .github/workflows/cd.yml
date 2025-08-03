@@ -51,7 +51,7 @@ jobs:
             fi
             
             # Check if the directory exists, 
-            if [ -d "Bank-Statment-Anaylser"  ]; then
+            if [ -d "$HOME/Bank-Statment-Anaylser"  ]; then
               echo "Directory 'Bank-Statment-Anaylser' exists. Cleaning up..."
               rm -rf Bank-Statment-Anaylser 
             fi
