@@ -1,0 +1,72 @@
+name: Development Deployment Workflow
+description: 'Automated deployment workflow for development branch'
+
+on:
+  push:
+    branches:
+      - dev
+
+
+jobs:
+  dev-deployment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          echo 'Dependencies installed'
+
+      - name: Deploy To Droplet
+        uses: appleboy/ssh-action@v1
+        run: echo "Deployment to droplet
+        with:
+          host: {{ secrets.DIGITALOCEAN_DROPLET_IP }}
+          username: root
+          key: {{ secrets.DIGITALOCEAN_SSH_PRIVATE_KEY}}
+          script: |
+            set -e
+            cd ~/Bank-Statment-Anaylser
+            
+            git pull origin dev
+            git reset --hard origin/dev
+            echo "Pulling git changes"
+            
+            source venv/scripts/activate
+            echo "Creating virtual environments"
+            
+            pip install -r requirements.txt
+            echo "installing packages!
+            
+            alembic upgrade head
+            echo "Running migrations using alembic"
+            
+            # Kill any running Uvicorn (ignore errors if none)
+            pkill -f "uvicorn app:app" || true
+            
+            # Start Uvicorn in background
+            nohup venv/bin/uvicorn app:app \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --reload False > uvicorn.log 2>&1 &
+            
+            echo "✅ Deployed at $(date)"
+            
+            
+
+
+
+      
+  
+
+
+
+
