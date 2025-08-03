@@ -20,18 +20,19 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+#      - name: Copy .env
+#        run: |
+#          echo "${{ secrets.ENV_FILE }}" > .env
 
-      - name: Install dependencies
+      - name: Check already installed dependencies
         run: |
-          pip install -r requirements.txt
-          echo "Dependencies installed"
+          pip freeze > installed.txt
+          echo "Installed dependencies fetched"
+
+      - name: Install only missing or new dependencies
+        run: |
+          pip install --cache-dir ~/.cache/pip -r <(grep -vxFf installed.txt requirements.txt)
+          echo "Only new/missing dependencies installed"
 
       - name: Deploy To Droplet
         uses: appleboy/ssh-action@v1
@@ -52,6 +53,9 @@ jobs:
             echo "Cloning repository..."
             git clone https://github.com/Benji918/Bank-Statment-Anaylser.git
             cd ~/Bank-Statment-Anaylser
+            
+            # Create .env file on the droplet
+            echo "${{ secrets.ENV_FILE }}" > .env
             
             # Ensure we're on the right branch
             git fetch origin dev
