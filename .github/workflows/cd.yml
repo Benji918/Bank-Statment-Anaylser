@@ -67,8 +67,8 @@ jobs:
               echo "✓ Using existing virtual environment"
             fi
             
-            source venv/scripts/activate
-            echo "✓ Creating virtual environments"
+            source venv/bin/activate
+            echo "✓ Activated virtual environment"
             
             pip install -r requirements.txt
             echo "✓ Dependencies installed"
