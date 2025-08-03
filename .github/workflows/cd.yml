@@ -35,20 +35,27 @@ jobs:
             set -e
             echo "🔄 Starting deployment..."
             
+            # Check if the directory exists, if not clone repo
+            if [! d "/Bank-Statment-Anaylser"]; then
+            echo "Repository not found....."
+            git clone https://github.com/Benji918/Bank-Statment-Anaylser.git
+            fi
+            
             cd ~/Bank-Statment-Anaylser
             
-            git pull origin dev
+            # Ensure we're on the right branch
+            git fetch origin dev
             git reset --hard origin/dev
-            echo "Pulling git changes"
+             echo "✓ Git changes pulled"
             
             source venv/scripts/activate
-            echo "Creating virtual environments"
+            echo "✓ Creating virtual environments"
             
             pip install -r requirements.txt
-            echo "installing packages!
+            echo "✓ Dependencies installed"
             
             alembic upgrade head
-            echo "Running migrations using alembic"
+            echo "✓ Database migrations completed"
             
             # Kill any running Uvicorn (ignore errors if none)
             pkill -f "uvicorn app:app" || true
