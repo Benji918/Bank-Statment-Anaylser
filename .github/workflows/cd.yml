@@ -36,7 +36,7 @@ jobs:
             echo "🔄 Starting deployment..."
             
             # Check if the directory exists, if not clone repo
-            if [! d "/Bank-Statment-Anaylser"]; then
+            if [ ! -d "~/Bank-Statment-Anaylser" ]; then
             echo "Repository not found....."
             git clone https://github.com/Benji918/Bank-Statment-Anaylser.git
             fi
