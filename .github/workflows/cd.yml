@@ -24,15 +24,15 @@ jobs:
 #        run: |
 #          echo "${{ secrets.ENV_FILE }}" > .env
 
-      - name: Check already installed dependencies
-        run: |
-          pip freeze > installed.txt
-          echo "Installed dependencies fetched"
-
-      - name: Install only missing or new dependencies
-        run: |
-          pip install --cache-dir ~/.cache/pip -r <(grep -vxFf installed.txt requirements.txt)
-          echo "Only new/missing dependencies installed"
+#      - name: Check already installed dependencies
+#        run: |
+#          pip freeze > installed.txt
+#          echo "Installed dependencies fetched"
+#
+#      - name: Install only missing or new dependencies
+#        run: |
+#          pip install --cache-dir ~/.cache/pip -r <(grep -vxFf installed.txt requirements.txt)
+#          echo "Only new/missing dependencies installed"
 
       - name: Deploy To Droplet
         uses: appleboy/ssh-action@v1
@@ -51,7 +51,7 @@ jobs:
             fi
             
             # Check if the directory exists, if not clone repo
-            if [ ! -d "~/Bank-Statment-Anaylser" ]; then
+            if [ -d "~/Bank-Statment-Anaylser" ]; then
               echo "Directory 'Bank-Statment-Anaylser' exists. Cleaning up..."
               rm -rf Bank-Statment-Anaylser 
             fi
@@ -80,8 +80,11 @@ jobs:
             source venv/bin/activate
             echo "✓ Activated virtual environment"
             
-            pip install -r requirements.txt
-            echo "✓ Dependencies installed"
+            pip freeze > installed.txt
+            echo "Installed dependencies fetched"
+            
+            pip install --cache-dir ~/.cache/pip -r <(grep -vxFf installed.txt requirements.txt)
+            echo "Only new/missing dependencies installed"
             
             # Check for multiple Alembic heads and merge them if necessary
             echo "Checking Alembic migrations..."
@@ -102,9 +105,9 @@ jobs:
             pm2 start venv/bin/python \
               --name "bank-statement-analyzer" \
               -- -m uvicorn app:app \
-              --host 0.0.0.0 \
-              --port 8000 \
-              --reload False
+              --host=0.0.0.0 \
+              --port=8000 \
+              --reload=false
             
             # Save PM2 process list
             pm2 save
