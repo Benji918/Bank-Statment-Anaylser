@@ -88,16 +88,31 @@ jobs:
             alembic upgrade head || { echo "Failed to run Alembic migrations"; exit 1; }
             echo "✓ Database migrations completed"
             
-            # Kill any running Uvicorn (ignore errors if none)
-            pkill -f "uvicorn app:app" || true
+            echo "Checking for existing uvicorn process..."
+            if pgrep -f "uvicorn app:app" > /dev/null; then
+                echo "Stopping existing uvicorn process..."
+                pkill -f "uvicorn app:app"
+                sleep 5  # Give the process time to shutdown gracefully
+            fi
             
-            # Start Uvicorn in background
+            echo "Starting uvicorn server..."
+            # Start the server and ensure it stays running
             nohup venv/bin/uvicorn app:app \
-            --host 0.0.0.0 \
-            --port 8000 \
-            --reload False > uvicorn.log 2>&1 &
+              --host 0.0.0.0 \
+              --port 8000 \
+              --reload False > uvicorn.log 2>&1 & 
             
-            echo "✅ Deployed at $(date)"
+            # Wait a moment to ensure the server starts
+            sleep 5
+            
+            # Check if the server is running
+            if pgrep -f "uvicorn app:app" > /dev/null; then
+                echo "✅ Server successfully started at $(date)"
+            else
+                echo "❌ Server failed to start"
+                cat uvicorn.log
+                exit 1
+            fi
             
             
 
