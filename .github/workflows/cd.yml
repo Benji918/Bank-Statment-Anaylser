@@ -5,7 +5,6 @@ on:
     branches:
       - dev
 
-
 jobs:
   dev-deployment:
     runs-on: ubuntu-latest
@@ -35,8 +34,8 @@ jobs:
                 npm install -g pm2
             fi
             
-            # Check if the directory exists, 
-            if [ -d "$HOME/Bank-Statment-Anaylser"  ]; then
+            # Check if the directory exists
+            if [ -d "$HOME/Bank-Statment-Anaylser" ]; then
               echo "Directory 'Bank-Statment-Anaylser' exists. Cleaning up..."
               rm -rf Bank-Statment-Anaylser 
             fi
@@ -52,7 +51,7 @@ jobs:
             git fetch origin dev
             git checkout dev
             git reset --hard origin/dev
-             echo "✓ Git changes pulled"
+            echo "✓ Git changes pulled"
             
             # Create or reuse existing environment
             if [ ! -d "venv" ]; then
@@ -91,7 +90,7 @@ jobs:
             alembic upgrade head || { echo "Failed to run Alembic migrations"; exit 1; }
             echo "✓ Database migrations completed"
             
-             # Stop any existing PM2 process for this app
+            # Stop any existing PM2 process for this app
             pm2 delete bank-statement-analyzer 2>/dev/null || true
             
             # Start the application with PM2
@@ -101,9 +100,6 @@ jobs:
               -- -m uvicorn main:app \
               --host=0.0.0.0 \
               --port=8000 
-            
-#            echo "Copying PM2 ecosystem file...."
-#            cp ecosystem.config.js $HOME/Bank-Statment-Anaylser/
             
             # Delete any existing celery
             pm2 delete celery-worker 2>/dev/null || true
@@ -131,18 +127,5 @@ jobs:
             else 
                 echo "❌ Celery workers failed to start"
                 pm2 logs celery-worker --lines 50
-                exit
+                exit 1
             fi
-            
-           
-            
-            
-
-
-
-      
-  
-
-
-
-
