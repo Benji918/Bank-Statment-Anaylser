@@ -106,7 +106,16 @@ jobs:
               --name "bank-statement-analyzer" \
               -- -m uvicorn main:app \
               --host=0.0.0.0 \
-              --port=8000 \
+              --port=8000 
+            
+            echo "Copying PM2 ecosystem file...."
+            cp ecosystem.config.js $HOME/Bank-Statment-Anaylser/
+            
+            # Delete any existing celery
+            pm2 delete celery-worker 2>/dev/null || true
+            
+            echo "Starting Celery workers with pm2"
+            cd $HOME/Bank-Statment-Anaylser && pm2 start ecosystem.config.js
            
             
             # Save PM2 process list
@@ -122,6 +131,14 @@ jobs:
                 echo "❌ Application failed to start"
                 pm2 logs bank-statement-analyzer --lines 50
                 exit 1
+            fi
+            
+            if pm2 show celery-worker | grep -q "online"; then
+                echo "✅ Celery workers successfully started with PM2"
+            else 
+                echo "❌ Celery workers failed to start"
+                pm2 logs celery-worker --lines 50
+                exit
             fi
             
            
