@@ -1,5 +1,4 @@
 name: Development Deployment Workflow
-description: 'Automated deployment workflow for development branch'
 
 on:
   push:
