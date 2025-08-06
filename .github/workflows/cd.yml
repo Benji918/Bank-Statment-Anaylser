@@ -104,8 +104,14 @@ jobs:
             # Delete any existing celery
             pm2 delete celery-worker 2>/dev/null || true
             
+            # Verify ecosystem file exists
+            if [ ! -f "ecosystem.config.js" ]; then
+               echo "❌ ecosystem.config.js not found!"
+              exit 1
+            fi
+            
             echo "Starting Celery workers with pm2"
-            cd $HOME/Bank-Statment-Anaylser && pm2 start ecosystem.config.js
+            pm2 start ecosystem.config.js
           
             # Save PM2 process list
             pm2 save
