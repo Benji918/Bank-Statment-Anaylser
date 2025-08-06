@@ -16,23 +16,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-
-#      - name: Copy .env
-#        run: |
-#          echo "${{ secrets.ENV_FILE }}" > .env
-
-#      - name: Check already installed dependencies
-#        run: |
-#          pip freeze > installed.txt
-#          echo "Installed dependencies fetched"
-#
-#      - name: Install only missing or new dependencies
-#        run: |
-#          pip install --cache-dir ~/.cache/pip -r <(grep -vxFf installed.txt requirements.txt)
-#          echo "Only new/missing dependencies installed"
 
       - name: Deploy To Droplet
         uses: appleboy/ssh-action@v1
