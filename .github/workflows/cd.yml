@@ -91,6 +91,8 @@ jobs:
               pip install alembic
             fi
             
+            pip install -r requirements.txt
+            
             # Check for multiple Alembic heads and merge them if necessary
             echo "Checking Alembic migrations..."
             alembic_heads=$($ALEMBIC_CWD heads | grep -v '^$' | wc -l)
