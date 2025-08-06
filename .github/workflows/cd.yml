@@ -84,12 +84,12 @@ jobs:
                 echo "✓ Requirements unchanged, skipping installation"
             fi
             
-            if ! command -v alembic &> /dev/null; then
-                echo "Alembic version not found"
-                exit 1
-            fi
-            
             ALEMBIC_CMD="$PWD/venv/bin/alembic"
+            
+            if [ ! -f "$ALEMBIC_CMD" ]; then
+              echo "Installing alembic..."
+              pip install alembic
+            fi
             
             # Check for multiple Alembic heads and merge them if necessary
             echo "Checking Alembic migrations..."
