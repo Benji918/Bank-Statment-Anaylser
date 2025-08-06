@@ -84,15 +84,22 @@ jobs:
                 echo "✓ Requirements unchanged, skipping installation"
             fi
             
-            # Check for multiple Alembic heads and merge them if necessary
-            echo "Checking Alembic migrations..."
-            alembic_heads=$(alembic heads | grep -v '^$' | wc -l)
-            if [ "$alembic_heads" -gt 1 ]; then
-                echo "Multiple Alembic heads detected. Merging heads..."
-                alembic merge heads -m "merge heads for deployment" || { echo "Failed to merge Alembic heads"; exit 1; }
+            if ! command -v alembic & > /dev/null; then
+                echo "Alembic version not found"
+                exit 1
             fi
             
-            alembic upgrade head || { echo "Failed to run Alembic migrations"; exit 1; }
+            ALEMBIC_CMD="$PWD/venv/bin/alembic"
+            
+            # Check for multiple Alembic heads and merge them if necessary
+            echo "Checking Alembic migrations..."
+            alembic_heads=$(ALEMBIC_CWD heads | grep -v '^$' | wc -l)
+            if [ "$alembic_heads" -gt 1 ]; then
+                echo "Multiple Alembic heads detected. Merging heads..."
+                ALEMBIC_CMD merge heads -m "merge heads for deployment" || { echo "Failed to merge Alembic heads"; exit 1; }
+            fi
+            
+            ALEMBIC_CMD upgrade head || { echo "Failed to run Alembic migrations"; exit 1; }
             echo "✓ Database migrations completed"
             
             # Delete any existing pm2 processes
