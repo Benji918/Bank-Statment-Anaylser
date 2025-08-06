@@ -15,7 +15,8 @@ jobs:
 
       - name: Setup Python
         uses: actions/setup-python@v4
-
+        with:
+          python-version: '3.11'
 
       - name: Deploy To Droplet
         uses: appleboy/ssh-action@v1
@@ -54,7 +55,7 @@ jobs:
             
             # Create or reuse existing environment
             if [ ! -d "venv" ]; then
-              python3 -m venv venv
+              python3.9 -m venv venv
               echo "✓ Virtual environment created"
             else 
               echo "✓ Using existing virtual environment"
@@ -89,8 +90,6 @@ jobs:
               echo "Installing alembic..."
               pip install alembic
             fi
-            
-            pip install pydantic==2.5.0
             
             # Check for multiple Alembic heads and merge them if necessary
             echo "Checking Alembic migrations..."
