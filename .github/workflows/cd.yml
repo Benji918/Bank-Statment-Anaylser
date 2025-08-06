@@ -37,7 +37,6 @@ jobs:
             # Check if the directory exists
             if [ -d "$HOME/Bank-Statment-Anaylser" ]; then
               echo "Directory 'Bank-Statment-Anaylser' exists....."
-#              rm -rf Bank-Statment-Anaylser
             fi
             
             echo "Pulling repository changes..."
