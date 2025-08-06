@@ -90,8 +90,7 @@ jobs:
               echo "Installing alembic..."
               pip install alembic
             fi
-            
-            pip install -r requirements.txt
+
             
             # Check for multiple Alembic heads and merge them if necessary
             echo "Checking Alembic migrations..."
