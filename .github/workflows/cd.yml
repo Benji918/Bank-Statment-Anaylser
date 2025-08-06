@@ -80,11 +80,20 @@ jobs:
             source venv/bin/activate
             echo "✓ Activated virtual environment"
             
-            pip freeze > installed.txt
-            echo "Installed dependencies fetched"
+            REQUIREMENTS_FILE="/root/.previous_requirements_hash"
+
+            # Calculate hash of current requirements.txt
+            CURRENT_HASH=$(md5sum requirements.txt | cut -d' ' -f1)
             
-            pip install --cache-dir ~/.cache/pip -r <(grep -vxFf installed.txt requirements.txt)
-            echo "Only new/missing dependencies installed"
+            # Check if hash file exists and compare hashes
+            if [ ! -f "$REQUIREMENTS_FILE" ] || [ "$(cat $REQUIREMENTS_FILE)" != "$CURRENT_HASH" ]; then
+                echo "📦 Requirements changed, installing dependencies..."
+                pip install -r requirements.txt
+                # Save new hash
+                echo "$CURRENT_HASH" > "$REQUIREMENTS_FILE"
+            else
+                echo "✓ Requirements unchanged, skipping installation"
+            fi
             
             # Check for multiple Alembic heads and merge them if necessary
             echo "Checking Alembic migrations..."
@@ -108,16 +117,15 @@ jobs:
               --host=0.0.0.0 \
               --port=8000 
             
-            echo "Copying PM2 ecosystem file...."
-            cp ecosystem.config.js $HOME/Bank-Statment-Anaylser/
+#            echo "Copying PM2 ecosystem file...."
+#            cp ecosystem.config.js $HOME/Bank-Statment-Anaylser/
             
             # Delete any existing celery
             pm2 delete celery-worker 2>/dev/null || true
             
             echo "Starting Celery workers with pm2"
             cd $HOME/Bank-Statment-Anaylser && pm2 start ecosystem.config.js
-           
-            
+          
             # Save PM2 process list
             pm2 save
             
