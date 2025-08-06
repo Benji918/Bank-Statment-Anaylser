@@ -18,7 +18,7 @@ module.exports = {
             args: "-A app.tasks.celery_app worker -l info",
             interpreter: "./venv/bin/python",
             exec_mode: "fork",
-            instances: 2,
+            instances: 1,
             autorestart: true,
             watch: false,
             cwd: "/root/Bank-Statment-Anaylser/"
