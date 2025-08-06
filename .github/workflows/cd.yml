@@ -36,21 +36,22 @@ jobs:
             
             # Check if the directory exists
             if [ -d "$HOME/Bank-Statment-Anaylser" ]; then
-              echo "Directory 'Bank-Statment-Anaylser' exists. Cleaning up..."
-              rm -rf Bank-Statment-Anaylser 
+              echo "Directory 'Bank-Statment-Anaylser' exists....."
+#              rm -rf Bank-Statment-Anaylser
             fi
             
-            echo "Cloning repository..."
-            git clone https://github.com/Benji918/Bank-Statment-Anaylser.git
-            cd ~/Bank-Statment-Anaylser
+            echo "Pulling repository changes..."
+            cd $HOME/Bank-Statment-Anaylser
             
             # Create .env file on the droplet
             echo "${{ secrets.ENV_FILE }}" > .env
             
             # Ensure we're on the right branch
+            git reset --hard HEAD
+            git clean -fd
             git fetch origin dev
             git checkout dev
-            git reset --hard origin/dev
+            git pull origin dev
             echo "✓ Git changes pulled"
             
             # Create or reuse existing environment
@@ -65,6 +66,11 @@ jobs:
             echo "✓ Activated virtual environment"
             
             REQUIREMENTS_FILE="/root/.previous_requirements_hash"
+            
+            if [ ! -f "requirements.txt" ]; then
+                echo "❌ requirements.txt not found!"
+                exit 1
+            fi
 
             # Calculate hash of current requirements.txt
             CURRENT_HASH=$(md5sum requirements.txt | cut -d' ' -f1)
@@ -90,19 +96,8 @@ jobs:
             alembic upgrade head || { echo "Failed to run Alembic migrations"; exit 1; }
             echo "✓ Database migrations completed"
             
-            # Stop any existing PM2 process for this app
-            pm2 delete bank-statement-analyzer 2>/dev/null || true
-            
-            # Start the application with PM2
-            echo "Starting application with PM2..."
-            pm2 start venv/bin/python \
-              --name "bank-statement-analyzer" \
-              -- -m uvicorn main:app \
-              --host=0.0.0.0 \
-              --port=8000 
-            
-            # Delete any existing celery
-            pm2 delete celery-worker 2>/dev/null || true
+            # Delete any existing pm2 processes
+            pm2 delete all 2>/dev/null || true
             
             # Verify ecosystem file exists
             if [ ! -f "ecosystem.config.js" ]; then
@@ -110,7 +105,7 @@ jobs:
               exit 1
             fi
             
-            echo "Starting Celery workers with pm2"
+            echo "Starting application with pm2"
             pm2 start ecosystem.config.js
           
             # Save PM2 process list
