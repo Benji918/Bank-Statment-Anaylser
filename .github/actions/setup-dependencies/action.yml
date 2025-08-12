@@ -45,5 +45,5 @@ runs:
             echo "✓ Directory '${{ inputs.app-directory }} exists"
           else
             echo "❌ Directory '${{ inputs.app-directory }}' does not exist"
-            exit 1
+            mkdir -p $HOME/${{ inputs.app-directory }}
           fi

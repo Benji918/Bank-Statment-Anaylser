@@ -1,9 +1,9 @@
-name: Development Deployment Workflow
+name: Production Deployment Workflow
 
 on:
   push:
     branches:
-      - dev
+      - main
 
 jobs:
   dev-deployment:
@@ -18,12 +18,12 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Deploy to Development Server
+      - name: Deploy to Production Server
         uses: ./.github/actions/deploy-to-server
         with:
-          host: ${{ secrets.DIGITALOCEAN_DROPLET_IP }}
-          username: 'root'
-          ssh-key: ${{ secrets.DIGITALOCEAN_SSH_PRIVATE_KEY }}
+          host: ${{ secrets.LINUX_ONE_VM_IP }}
+          username: ${{ secrets.LINUX_ONE_VM_USERNAME }}
+          ssh-key: ${{ secrets.LINUX_ONE_VM_SSH_KEY }}
           env-file: ${{ secrets.ENV_FILE }}
-          branch: 'dev'
-          app-directory: 'Bank-Statment-Anaylser'
+          branch: 'main'
+          app-directory: 'Bank-Statment-Anaylser-main'
