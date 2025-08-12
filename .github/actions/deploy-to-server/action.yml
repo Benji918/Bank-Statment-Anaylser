@@ -38,6 +38,7 @@ runs:
         with:
           host: ${{ inputs.host }}
           username: ${{ inputs.username }}
+          ssh-key: ${{ inputs.ssh-key }}
           app-directory: ${{ inputs.app-directory }}
 
 
