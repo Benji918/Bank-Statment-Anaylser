@@ -44,17 +44,22 @@ runs:
           echo "${{ inputs.env-file }}" > .env
           echo "✓ Environment file created"
           
-          #Initialize the git if ,git doesn't exsits
+          #Initialize the git if .git doesn't exists
           if [ ! -d .git ]; then
             git init
+            echo "Git folder created"
             git remote add origin ${{ inputs.repository-url }}
+            git fetch origin ${{ inputs.branch }}
+            git checkout -b ${{ inputs.branch }}
+            git pull origin ${{ inputs.branch }}
           
+          else
+            echo "Git folder already exists"
+            # Ensure we're on the right branch
+            git reset --hard HEAD
+            git clean -fd
+            git fetch origin ${{ inputs.branch }}
+            git checkout ${{ inputs.branch }}
+            git pull origin ${{ inputs.branch }} 
           fi
-          
-          # Ensure we're on the right branch
-          git reset --hard HEAD
-          git clean -fd
-          git fetch origin ${{ inputs.branch }}
-          git checkout ${{ inputs.branch }}
-          git pull origin ${{ inputs.branch }}
           echo "✓ Git changes pulled successfully"

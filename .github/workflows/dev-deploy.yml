@@ -8,7 +8,7 @@ on:
 
 
 jobs:
-  dev-deployment:
+  prod-deployment:
     runs-on: ubuntu-latest
 
     steps:
