@@ -34,6 +34,17 @@ runs:
           
           cd $HOME/${{ inputs.app-directory }}
           
+          if ! command -v python3.11 &> /dev/null; then
+            echo "Installing Python 3.11....."
+            sudo add-apt-repository ppa:deadsnakes/ppa -y
+            sudo apt-get update
+            sudo apt-get install -y python3.11 python3.11-venv
+            
+            echo "✓ Python 3.11 installed"
+          
+          fi
+            
+          
           # Create or reuse existing environment
           if [ ! -d "venv" ]; then
             python3.11 -m venv venv
