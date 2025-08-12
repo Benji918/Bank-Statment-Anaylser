@@ -55,9 +55,6 @@ runs:
           
           else
             echo "Git folder already exists"
-            # Ensure we're on the right branch
-            git reset --hard HEAD
-            git clean -fd
             git fetch origin ${{ inputs.branch }}
             git checkout ${{ inputs.branch }}
             git pull origin ${{ inputs.branch }} 
