@@ -21,6 +21,10 @@ inputs:
     description: 'Application directory name'
     required: true
 
+  repository-url:
+    description: 'Git repository URL'
+    required: false
+
 runs:
   using: 'composite'
   steps:
@@ -39,6 +43,13 @@ runs:
           # Create .env file on the droplet
           echo "${{ inputs.env-file }}" > .env
           echo "✓ Environment file created"
+          
+          #Initialize the git if ,git doesn't exsits
+          if [ ! -d .git ]; then
+            git init
+            git remote add origin ${{ inputs.repository-url }}
+          
+          fi
           
           # Ensure we're on the right branch
           git reset --hard HEAD

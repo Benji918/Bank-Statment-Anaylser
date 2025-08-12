@@ -28,6 +28,10 @@ inputs:
       description: 'Application directory name'
       required: true
 
+  repository-url:
+    description: 'Git repository URL'
+    required: false
+
 
 
 runs:
@@ -51,6 +55,7 @@ runs:
           env-file: ${{ inputs.env-file }}
           branch: ${{ inputs.branch }}
           app-directory: ${{ inputs.app-directory }}
+          repository-url: ${{ inputs.repository-url }}
 
 
       - name: Setup Python Environment

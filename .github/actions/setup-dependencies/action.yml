@@ -46,4 +46,5 @@ runs:
           else
             echo "❌ Directory '${{ inputs.app-directory }}' does not exist"
             mkdir -p $HOME/${{ inputs.app-directory }}
+            echo "🙂Created required directory!!!"
           fi

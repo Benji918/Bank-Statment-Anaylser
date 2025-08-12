@@ -29,3 +29,4 @@ jobs:
           env-file: ${{ secrets.ENV_FILE }}
           branch: 'main'
           app-directory: 'Bank-Statment-Anaylser-main'
+          repository-url: 'https://github.com/Benji918/Bank-Statment-Anaylser.git'
