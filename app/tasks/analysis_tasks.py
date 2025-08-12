@@ -27,6 +27,7 @@ def process_statement_analysis(
     )
 
     db: Session = SessionLocal()
+    analysis = None
 
     try:
         logger.info(
@@ -41,13 +42,12 @@ def process_statement_analysis(
             meta={"current": 20, "total": 100, "status": "Downloading file..."}
         )
 
-        # Handle async function call properly
+
         try:
-            # Get or create event loop for async function
+
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-            # Run the async function and get the actual result
             analysis = loop.run_until_complete(
                 analysis_service.create_analysis(
                     db, statement_id, user_id, analysis_type
@@ -57,6 +57,10 @@ def process_statement_analysis(
         except Exception as async_error:
             logger.error(f"Async analysis creation failed: {str(async_error)}")
 
+
+        if not analysis:
+            logger.error("No analysis object could be created.")
+            raise ValueError("Analysis is None.")
 
 
         self.update_state(
@@ -70,20 +74,30 @@ def process_statement_analysis(
             meta={"current": 90, "total": 100, "status": "Finalizing results..."}
         )
 
-        logger.info(
-            "Analysis task completed",
-            task_id=self.request.id,
-            analysis_id=analysis.id,
-            statement_id=statement_id
-        )
+        if analysis:
+            logger.info(
+                "Analysis task completed",
+                task_id=self.request.id,
+                analysis_id=analysis.id,
+                statement_id=statement_id
+            )
 
-        return {
-            "status": "completed",
-            "analysis_id": analysis.id,
-            "statement_id": statement_id,
-            "financial_health_score": analysis.financial_health_score,
-            "processing_time": analysis.processing_time_seconds
-        }
+            return {
+                "status": "completed",
+                "analysis_id": analysis.id,
+                "statement_id": statement_id,
+                "financial_health_score": analysis.financial_health_score,
+                "processing_time": analysis.processing_time_seconds
+            }
+
+        else:
+            logger.warning(
+                "Analysis task completed, but analysis object is None.",
+                task_id=self.request.id,
+                statement_id=statement_id
+            )
+
+
 
     except Exception as e:
         logger.error(
@@ -93,7 +107,6 @@ def process_statement_analysis(
             error=str(e)
         )
 
-        # Update statement status to failed
         try:
             from app.services.statement_service import statement_service
             from app.models.statement import StatementStatus

@@ -1,0 +1,82 @@
+name: 'Deploy To Server'
+description: 'Deploy application to remote server via SSH'
+
+inputs:
+  host:
+    description: 'Target Server/VM'
+    required: true
+
+  username:
+    description: 'SSH username'
+    required: true
+    default: 'root'
+
+  ssh-key:
+    description: 'SSH private key'
+    required: true
+
+  env-file:
+    description: 'Environment file contents'
+    required: true
+
+  branch:
+      description: 'Git branch to deploy'
+      required: true
+      default: 'dev'
+
+  app-directory:
+      description: 'Application directory name'
+      required: true
+
+
+
+runs:
+  using: 'composite'
+  steps:
+      - name: Setup Dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          host: ${{ inputs.host }}
+          username: ${{ inputs.username }}
+          app-directory: ${{ inputs.app-directory }}
+
+
+      - name: Deploy Code
+        uses: ./.github/actions/deploy-code
+        with:
+          host: ${{ inputs.host }}
+          username: ${{ inputs.username }}
+          ssh-key: ${{ inputs.ssh-key }}
+          env-file: ${{ inputs.env-file }}
+          branch: ${{ inputs.branch }}
+          app-directory: ${{ inputs.app-directory }}
+
+
+      - name: Setup Python Environment
+        uses: ./.github/actions/setup-python-env
+        with:
+          host: ${{ inputs.host }}
+          username: ${{ inputs.username }}
+          ssh-key: ${{ inputs.ssh-key }}
+          app-directory: ${{ inputs.app-directory }}
+
+
+      - name: Run Database Migrations
+        uses: ./.github/actions/run-migrations
+        with:
+            host: ${{ inputs.host }}
+            username: ${{ inputs.username }}
+            ssh-key: ${{ inputs.ssh-key }}
+            app-directory: ${{ inputs.app-directory }}
+
+      - name: Start Application
+        uses: ./.github/actions/start-application
+        with:
+          host: ${{ inputs.host }}
+          username: ${{ inputs.username }}
+          ssh-key: ${{ inputs.ssh-key }}
+          app-directory: ${{ inputs.app-directory }}
+
+
+
+

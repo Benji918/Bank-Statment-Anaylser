@@ -1,0 +1,29 @@
+name: Development Deployment Workflow
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  dev-deployment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Deploy to Development Server
+        uses: ./.github/actions/deploy-to-server
+        with:
+          host: ${{ secrets.DIGITALOCEAN_DROPLET_IP }}
+          username: 'root'
+          ssh-key: ${{ secrets.DIGITALOCEAN_SSH_PRIVATE_KEY }}
+          env-file: ${{ secrets.ENV_FILE }}
+          branch: 'dev'
+          app-directory: 'Bank-Statment-Anaylser'

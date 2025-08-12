@@ -15,12 +15,206 @@ from app.schemas.analysis import (
 )
 import json
 
+import re
+import hashlib
+from typing import Dict, Any, List
+import fitz  # PyMuPDF for PDF processing
+from dataclasses import dataclass
+
+@dataclass
+class SanitizationConfig:
+    """Configuration for what data to sanitize"""
+    redact_account_numbers: bool = True
+    redact_phone_numbers: bool = True
+    redact_emails: bool = True
+    redact_addresses: bool = True
+    redact_names: bool = True
+    redact_ssn: bool = True
+    preserve_transaction_amounts: bool = True
+    preserve_dates: bool = True
+    preserve_merchant_names: bool = True
+
+class BankStatementSanitizer:
+    def __init__(self, config: SanitizationConfig = None):
+        self.config = config or SanitizationConfig()
+        self.replacement_map = {}  # Store original -> sanitized mappings
+        self.logger = LoggerMixin
+
+    def _generate_consistent_replacement(self, original_value: str, prefix: str) -> str:
+        """Generate consistent replacement for same values"""
+        self.logger.log_operation("generating_replacement", original_value=original_value, prefix=prefix)
+        if original_value in self.replacement_map:
+            return self.replacement_map[original_value]
+
+        # Create hash-based consistent replacement
+        hash_obj = hashlib.md5(original_value.encode())
+        hash_hex = hash_obj.hexdigest()[:8]
+        replacement = f"{prefix}_{hash_hex}"
+
+        self.replacement_map[original_value] = replacement
+        return replacement
+
+    def _sanitize_account_numbers(self, text: str) -> str:
+        """Replace account numbers with sanitized versions"""
+        self.logger.log_operation("sanitizing_account_numbers")
+        if not self.config.redact_account_numbers:
+            return text
+
+        # Pattern for account numbers (8-17 digits, possibly with dashes/spaces)
+        account_pattern = r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4,9}\b'
+
+        def replace_account(match):
+            account = match.group(0)
+            return self._generate_consistent_replacement(account, "ACCT")
+
+        return re.sub(account_pattern, replace_account, text)
+
+    def _sanitize_phone_numbers(self, text: str) -> str:
+        """Replace phone numbers"""
+        self.logger.log_operation("sanitizing_phone_numbers")
+        if not self.config.redact_phone_numbers:
+            return text
+
+        phone_patterns = [
+            r'\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b',  # US format
+            r'\(\d{3}\)\s?\d{3}[-.\s]?\d{4}',      # (123) 456-7890
+            r'\+\d{1,3}[-.\s]?\d{3,14}\b'          # International
+        ]
+
+        for pattern in phone_patterns:
+            def replace_phone(match):
+                phone = match.group(0)
+                return self._generate_consistent_replacement(phone, "PHONE")
+            text = re.sub(pattern, replace_phone, text)
+
+        return text
+
+    def _sanitize_emails(self, text: str) -> str:
+        """Replace email addresses"""
+        self.logger.log_operation("sanitizing_emails")
+        if not self.config.redact_emails:
+            return text
+
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+
+        def replace_email(match):
+            email = match.group(0)
+            return self._generate_consistent_replacement(email, "EMAIL")
+
+        return re.sub(email_pattern, replace_email, text)
+
+    def _sanitize_addresses(self, text: str) -> str:
+        """Replace street addresses (basic implementation)"""
+        self.logger.log_operation("sanitizing_addresses")
+        if not self.config.redact_addresses:
+            return text
+
+        # Simple address patterns - you may need more sophisticated NER
+        address_patterns = [
+            r'\d+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Way|Place|Pl)\b',
+            r'P\.?O\.?\s+Box\s+\d+',
+        ]
+
+        for pattern in address_patterns:
+            def replace_address(match):
+                address = match.group(0)
+                return self._generate_consistent_replacement(address, "ADDRESS")
+            text = re.sub(pattern, replace_address, text, flags=re.IGNORECASE)
+
+        return text
+
+    def _sanitize_ssn(self, text: str) -> str:
+        """Replace Social Security Numbers"""
+        if not self.config.redact_ssn:
+            return text
+
+        ssn_pattern = r'\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b'
+
+        def replace_ssn(match):
+            ssn = match.group(0)
+            return self._generate_consistent_replacement(ssn, "SSN")
+
+        return re.sub(ssn_pattern, replace_ssn, text)
+
+    def _sanitize_names(self, text: str) -> str:
+        """Replace common name patterns (basic implementation)"""
+        if not self.config.redact_names:
+            return text
+
+        # This is a basic implementation - consider using NER libraries like spaCy
+        # Pattern for capitalized words that might be names
+        name_indicators = [
+            r'\b(?:Mr\.?|Mrs\.?|Ms\.?|Dr\.?|Prof\.?)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*',
+            # Add more sophisticated name detection as needed
+        ]
+
+        for pattern in name_indicators:
+            def replace_name(match):
+                name = match.group(0)
+                return self._generate_consistent_replacement(name, "NAME")
+            text = re.sub(pattern, replace_name, text)
+
+        return text
+
+    def sanitize_text(self, text: str) -> str:
+        """Apply all sanitization rules to text"""
+        sanitized = text
+
+        # Apply sanitization in order
+        sanitized = self._sanitize_account_numbers(sanitized)
+        sanitized = self._sanitize_phone_numbers(sanitized)
+        sanitized = self._sanitize_emails(sanitized)
+        sanitized = self._sanitize_ssn(sanitized)
+        sanitized = self._sanitize_addresses(sanitized)
+        sanitized = self._sanitize_names(sanitized)
+
+        return sanitized
+
+    def sanitize_pdf(self, pdf_bytes: bytes) -> bytes:
+        """Sanitize a PDF document and return sanitized PDF bytes"""
+        self.logger.log_operation("sanitizing_pdf")
+        # Open PDF from bytes
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+
+            # Extract text blocks
+            text_dict = page.get_text("dict")
+
+            # Process each text block
+            for block in text_dict["blocks"]:
+                if "lines" in block:
+                    for line in block["lines"]:
+                        for span in line["spans"]:
+                            original_text = span["text"]
+                            sanitized_text = self.sanitize_text(original_text)
+
+                            if original_text != sanitized_text:
+                                # Replace text in PDF
+                                rect = fitz.Rect(span["bbox"])
+                                page.add_redact_annot(rect)
+                                page.apply_redactions()
+
+                                # Add sanitized text
+                                page.insert_text(
+                                    rect.tl,
+                                    sanitized_text,
+                                    fontsize=span["size"],
+                                    color=(0, 0, 0)
+                                )
+
+        # Return sanitized PDF as bytes
+        return doc.write()
+
+    def get_replacement_map(self) -> Dict[str, str]:
+        """Get the mapping of original -> sanitized values for audit purposes"""
+        return self.replacement_map.copy()
 
 class AIAnalysisService(LoggerMixin):
     """Service for AI-powered financial analysis using Google Gemini with direct file upload"""
     
     def __init__(self):
-        # Configure Gemini
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
         
     def _create_analysis_prompt(self, analysis_type: str = "comprehensive") -> str:
@@ -29,6 +223,24 @@ class AIAnalysisService(LoggerMixin):
         prompt = f"""
         You are a professional financial analyst with expertise in bank statement analysis. 
         Analyze the uploaded bank statement file and provide comprehensive financial insights.
+        Note that sensitive personal information has been sanitized for privacy (account numbers, emails, phones, addresses 
+        replaced with consistent placeholders).
+        
+        PRIVACY INSTRUCTION: This document contains sensitive financial information. 
+                    
+                    Analyze this bank statement focusing ONLY on:
+                    1. Transaction patterns and spending trends
+                    2. Income frequency and regularity  
+                    3. Account balance movements
+                    4. Spending categories and amounts
+                    5. Financial health indicators
+                    
+                    CRITICAL: Do NOT reproduce, reference, or analyze:
+                    - Account numbers
+                    - Personal names or addresses  
+                    - Phone numbers or email addresses
+                    - Routing numbers or bank details
+                    - Any personally identifiable information
         
         Please examine the document carefully and provide a detailed analysis including:
         
@@ -210,11 +422,26 @@ class AIAnalysisService(LoggerMixin):
         self, 
         file_content: bytes, 
         filename: str,
-        analysis_type: str = "comprehensive"
+        analysis_type: str = "comprehensive",
+        sanitization_config: SanitizationConfig = None
     ) -> Dict[str, Any]:
         """Perform comprehensive financial analysis using direct file upload to Gemini"""
         try:
             self.log_operation("ai_analysis_start", filename=filename, analysis_type=analysis_type)
+
+            # sanitizer = BankStatementSanitizer(sanitization_config)
+            #
+            # if filename.lower().endswith('.pdf'):
+            #     sanitized_content = sanitizer.sanitize_pdf(file_content)
+            #
+            # else:
+            #     text_content = file_content.decode('utf-8', errors='ignore')
+            #     sanitized_text = sanitizer.sanitize_text(text_content)
+            #     sanitized_content = sanitized_text.encode('utf-8')
+            #
+            # replacement_count = len(sanitizer.get_replacement_map())
+            # self.log_operation("sanitization_complete",
+            #                    replacements_made=replacement_count)
 
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
                 temp_file.write(file_content)
@@ -246,6 +473,9 @@ class AIAnalysisService(LoggerMixin):
                         uploaded_file,
                         prompt
                     ])
+
+                    if not response or len(response.strip()) == 0:
+                        raise ExternalServiceError("Gemini returned empty content.")
 
                     if hasattr(response, 'text'):
                          response_text = response.text
@@ -296,7 +526,8 @@ class AIAnalysisService(LoggerMixin):
                         self.log_error(e, "temp_file_cleanup_failed")
                         
         except Exception as e:
-            self.log_error(e, "analyze_financial_document", filename=filename)
+            self.log_error(error=e, operation="analyze_financial_document", filename=filename)
+
             return None
             # Return fallback analysis instead of failing
             # return self._create_fallback_analysis(filename)

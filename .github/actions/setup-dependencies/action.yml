@@ -1,0 +1,49 @@
+name: 'Setup Dependencies'
+description: 'Install required system dependencies on the server'
+
+inputs:
+  host:
+    description: 'Target server host/IP'
+    required: true
+  username:
+    description: 'SSH username'
+    required: true
+  ssh-key:
+    description: 'SSH private key'
+    required: true
+
+  app-directory:
+    description: 'Application directory name'
+    required: true
+
+
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install PM2 and Check Directory
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ inputs.host }}
+        username: ${{ inputs.username }}
+        key: ${{ inputs.ssh-key }}
+        script: |
+          set -e
+          echo "🔄 Setting up dependencies..."
+          
+          # Install PM2 if not already installed
+          if ! command -v pm2 &> /dev/null; then
+              echo "Installing PM2..."
+              npm install -g pm2
+              echo "✓ PM2 installed"
+          else
+              echo "✓ PM2 already installed"
+          fi
+          
+          # Check if the directory exists
+          if [ -d "$HOME/${{ inputs.app-directory }}" ]; then
+            echo "✓ Directory '${{ inputs.app-directory }} exists"
+          else
+            echo "❌ Directory '${{ inputs.app-directory }}' does not exist"
+            exit 1
+          fi

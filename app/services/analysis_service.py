@@ -30,7 +30,7 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
     ) -> Analysis:
         """Create comprehensive financial analysis for a statement"""
         try:
-            # Get statement
+
             statement = db.query(Statement).filter(
                 and_(Statement.id == statement_id, Statement.user_id == user_id)
             ).first()
@@ -43,20 +43,20 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
             if statement.status != StatementStatus.UPLOADED:
                 raise ValidationError("Statement must be in uploaded status for analysis")
             
-            # Update statement status to processing
+
             from app.services.statement_service import statement_service
             statement_service.update_processing_status(
                 db, statement_id, StatementStatus.PROCESSING
             )
             
-            # Download file from Cloudinary
+
             pdf_content = await file_service.download_from_cloudinary(
                 statement.cloudinary_public_id
             )
 
-            
-            # Perform AI analysis directly with PDF file
+
             start_time = datetime.utcnow()
+            self.log_operation("create_analysis", statement_id=statement_id, user_id=user_id)
             analysis_result = await ai_service.analyze_financial_document(
                 pdf_content, 
                 statement.original_filename,
@@ -101,6 +101,8 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
                 detailed_analysis=analysis_result["detailed_analysis"],
             )
 
+            print(analysis)
+
             db.add(analysis)
             db.commit()
             db.refresh(analysis)
@@ -123,7 +125,7 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
             )
             
             self.log_operation(
-                "create_analysis",
+                "create_analysis_process_time",
                 analysis_id=analysis.id,
                 statement_id=statement_id,
                 user_id=user_id,

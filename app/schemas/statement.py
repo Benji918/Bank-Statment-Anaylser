@@ -42,8 +42,8 @@ class StatementResponse(StatementBase, TimestampMixin):
     processing_completed_at: Optional[datetime] = None
     error_message: Optional[str] = None
     account_number_masked: Optional[str] = None
-    statement_period_start: Optional[datetime] = None
-    statement_period_end: Optional[datetime] = None
+    statement_period_start: Optional[str] = None
+    statement_period_end: Optional[str] = None
     tags: Optional[List[str]] = None
     cloudinary_url: Optional[str] = None
     

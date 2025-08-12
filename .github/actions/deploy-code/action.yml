@@ -1,0 +1,49 @@
+name: 'Deploy Code'
+description: 'Deploy application code to the server'
+
+inputs:
+  host:
+    description: 'Target server host/IP'
+    required: true
+  username:
+    description: 'SSH username'
+    required: true
+  ssh-key:
+    description: 'SSH private key'
+    required: true
+  env-file:
+    description: 'Environment file contents'
+    required: true
+  branch:
+    description: 'Git branch to deploy'
+    required: true
+  app-directory:
+    description: 'Application directory name'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Pull Repository Changes
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ inputs.host }}
+        username: ${{ inputs.username }}
+        key: ${{ inputs.ssh-key }}
+        script: |
+          set -e
+          echo "📥 Pulling repository changes..."
+          
+          cd $HOME/${{ inputs.app-directory }}
+          
+          # Create .env file on the droplet
+          echo "${{ inputs.env-file }}" > .env
+          echo "✓ Environment file created"
+          
+          # Ensure we're on the right branch
+          git reset --hard HEAD
+          git clean -fd
+          git fetch origin ${{ inputs.branch }}
+          git checkout ${{ inputs.branch }}
+          git pull origin ${{ inputs.branch }}
+          echo "✓ Git changes pulled successfully"

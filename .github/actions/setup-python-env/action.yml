@@ -1,0 +1,71 @@
+name: 'Setup Python Environment'
+description: 'Setup Python virtual environment and install dependencies'
+
+inputs:
+  host:
+    description: 'Target server host/IP'
+    required: true
+  username:
+    description: 'SSH username'
+    required: true
+  ssh-key:
+    description: 'SSH private key'
+    required: true
+  app-directory:
+    description: 'Application directory name'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Virtual Environment and Dependencies
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ inputs.host }}
+        username: ${{ inputs.username }}
+        key: ${{ inputs.ssh-key }}
+        script: |
+          set -e
+          echo "🐍 Setting up Python environment..."
+          
+          cd $HOME/${{ inputs.app-directory }}
+          
+          # Create or reuse existing environment
+          if [ ! -d "venv" ]; then
+            python3.11 -m venv venv
+            echo "✓ Virtual environment created"
+          else 
+            echo "✓ Using existing virtual environment"
+          fi
+          
+          source venv/bin/activate
+          echo "✓ Activated virtual environment"
+          
+          REQUIREMENTS_FILE="/root/.previous_requirements_hash"
+          
+          if [ ! -f "requirements.txt" ]; then
+              echo "❌ requirements.txt not found!"
+              exit 1
+          fi
+
+          # Calculate hash of current requirements.txt
+          CURRENT_HASH=$(md5sum requirements.txt | cut -d' ' -f1)
+          
+          # Check if hash file exists and compare hashes
+          if [ ! -f "$REQUIREMENTS_FILE" ] || [ "$(cat $REQUIREMENTS_FILE)" != "$CURRENT_HASH" ]; then
+              echo "📦 Requirements changed, installing dependencies..."
+              pip install -r requirements.txt
+              # Save new hash
+              echo "$CURRENT_HASH" > "$REQUIREMENTS_FILE"
+              echo "✓ Dependencies installed"
+          else
+              echo "✓ Requirements unchanged, skipping installation"
+          fi
+          
+          # Install alembic if not present
+          ALEMBIC_CWD="$PWD/venv/bin/alembic"
+          if [ ! -f "$ALEMBIC_CWD" ]; then
+            echo "Installing alembic..."
+            pip install alembic
+            echo "✓ Alembic installed"
+          fi

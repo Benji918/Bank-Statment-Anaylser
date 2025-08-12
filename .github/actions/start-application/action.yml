@@ -1,0 +1,78 @@
+name: 'Start Application'
+description: 'Start the application and celery workers using PM2'
+
+inputs:
+  host:
+    description: 'Target server host/IP'
+    required: true
+  username:
+    description: 'SSH username'
+    required: true
+  ssh-key:
+    description: 'SSH private key'
+    required: true
+  app-directory:
+    description: 'Application directory name'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Start Services with PM2
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ inputs.host }}
+        username: ${{ inputs.username }}
+        key: ${{ inputs.ssh-key }}
+        script: |
+          set -e
+          echo "🚀 Starting application services..."
+          
+          cd $HOME/${{ inputs.app-directory }}
+          
+          # Delete any existing pm2 processes
+          pm2 delete all 2>/dev/null || true
+          echo "✓ Cleared existing PM2 processes"
+          
+          # Verify ecosystem file exists
+          if [ ! -f "ecosystem.config.js" ]; then
+             echo "❌ ecosystem.config.js not found!"
+            exit 1
+          fi
+          
+          echo "Starting application with PM2..."
+          pm2 start ecosystem.config.js || { 
+            echo "❌ PM2 failed to start application"; 
+            pm2 logs --lines 50; 
+            exit 1; 
+          }
+        
+          # Save PM2 process list
+          pm2 save
+          echo "✓ PM2 process list saved"
+          
+          # Ensure PM2 starts on system reboot
+          pm2 startup
+          echo "✓ PM2 startup configured"
+          
+          # Wait a moment for services to fully start
+          sleep 5
+          
+          # Check if the application is running
+          if pm2 show bank-statement-analyzer | grep -q "online"; then
+              echo "✅ Application successfully started with PM2 at $(date)"
+          else
+              echo "❌ Application failed to start"
+              pm2 logs bank-statement-analyzer --lines 50
+              exit 1
+          fi
+          
+          if pm2 show celery-worker | grep -q "online"; then
+              echo "✅ Celery workers successfully started with PM2"
+          else 
+              echo "❌ Celery workers failed to start"
+              pm2 logs celery-worker --lines 50
+              exit 1
+          fi
+          
+          echo "🎉 Deployment completed successfully!"
