@@ -15,7 +15,7 @@ module.exports = {
         {
             name: "celery-worker",
             script: "venv/bin/celery",
-            args: "-A app.tasks.celery_app worker -l info",
+            args: "-A app.tasks.celery_app worker -l info --prefetch-multiplier=1 --autoscale=10,5",
             interpreter: "./venv/bin/python",
             exec_mode: "fork",
             instances: 1,
