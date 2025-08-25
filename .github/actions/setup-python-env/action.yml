@@ -69,7 +69,7 @@ runs:
           # Check if hash file exists and compare hashes
           if [ ! -f "$REQUIREMENTS_FILE" ] || [ "$(cat $REQUIREMENTS_FILE)" != "$CURRENT_HASH" ]; then
               echo "📦 Requirements changed, installing dependencies..."
-              pip install -r requirements.txt
+              pip install -r requirements.txt --no-cache-dir
               # Save new hash
               echo "$CURRENT_HASH" > "$REQUIREMENTS_FILE"
               echo "✓ Dependencies installed"
