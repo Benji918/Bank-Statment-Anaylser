@@ -66,8 +66,8 @@ openpyxl==3.1.2
 packaging==25.0
 passlib==1.7.4
 pathspec==0.12.1
-pdfminer.six==20250506
-pdfplumber==0.11.7
+pdfminer.six==20221105
+pdfplumber==0.10.3
 Pillow==10.1.0
 platformdirs==4.3.8
 pluggy==1.6.0
@@ -86,7 +86,6 @@ pydantic_core==2.14.1
 pyflakes==3.1.0
 pyparsing==3.2.3
 PyPDF2==3.0.1
-pypdfium2==4.30.0
 pytest==7.4.3
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
