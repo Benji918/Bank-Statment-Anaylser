@@ -10,6 +10,12 @@ import pandas as pd
 from app.core.config import settings
 from app.core.logging import LoggerMixin
 from app.core.exceptions import ExternalServiceError, FileProcessingError
+import pdfplumber
+import PyPDF2
+import re
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
 
 
 class PDFExcelService(LoggerMixin):
@@ -263,6 +269,65 @@ class PDFExcelService(LoggerMixin):
         except Exception as e:
             self.log_error(e, "extract_metadata")
             return {}
+
+
+    def extract_text_from_pdf(pdf_path):
+        text = ""
+        try:
+            with pdfplumber.open(pdf_path) as pdf:
+                for page in pdf.pages:
+                    text += page.extract_text() + "\n"
+        except:
+            # Fallback to PyPDF2
+            with open(pdf_path, "rb") as f:
+                reader = PyPDF2.PdfReader(f)
+                for page in reader.pages:
+                    text += page.extract_text() + "\n"
+        return text
+
+    @staticmethod
+    def deterministic_hash(value: str, salt: str = "fixed_salt_123") -> str:
+        digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+        digest.update((value + salt).encode())
+        return digest.finalize().hex()[:16]
+
+    @staticmethod
+    def anonymize_text(text: str, patterns: Dict[str, str]) -> str:
+        # Compile all patterns once
+        compiled_patterns = {
+            key: re.compile(pattern)
+            for key, pattern in patterns.items()
+        }
+
+        # Create a list of all matches with their positions
+        matches = []
+        for key, pattern in compiled_patterns.items():
+            for match in pattern.finditer(text):
+                start, end = match.span()
+                matches.append((
+                    start,
+                    end,
+                    match.group(),
+                    key
+                ))
+
+        # Sort matches by position in reverse order
+        # This ensures replacements don't affect other matches' positions
+        matches.sort(key=lambda x: x[0], reverse=True)
+
+        # Convert text to list of characters for efficient manipulation
+        text_chars = list(text)
+
+        # Process each match
+        for start, end, original, key in matches:
+            hashed_value = PDFExcelService.deterministic_hash(original)
+            replacement = f"{key.upper()}_{hashed_value}"
+            text_chars[start:end] = replacement
+
+        # Join characters back into string
+        return ''.join(text_chars)
+
+
 
 
 # Create service instance

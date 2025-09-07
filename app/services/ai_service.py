@@ -18,7 +18,6 @@ import json
 import re
 import hashlib
 from typing import Dict, Any, List
-import fitz  # PyMuPDF for PDF processing
 from dataclasses import dataclass
 
 @dataclass

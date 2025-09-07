@@ -15,6 +15,10 @@ from app.models.user import User
 from app.models.statement import StatementCategory
 from app.core.exceptions import ValidationError, FileProcessingError
 from app.core.logging import get_logger
+import os
+import tempfile
+from app.services.pdf_service import PDFExcelService
+
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -298,3 +302,44 @@ def bulk_delete_statements(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Bulk delete failed"
         )
+
+@router.post("/test-pdf-hashing")
+async def analyze_statement(file: UploadFile = File(...)):
+    patterns = {
+        "email": r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+        "phone": r'\b(?:\+234|0)([789]\d{9})\b',
+        "account_number": r'\b\d{10,20}\b',
+        "address": r'\d+\s+\w+(?:\s+\w+)*\s+(Street|St|Avenue|Ave|Close|Rd|Road|Lane|Ln|Crescent|Cres)\b',
+        "name": r'\b[A-Z][a-z]+ [A-Z][a-z]+\b',
+        "bvn": r'\b\d{11}\b',
+        "ssn": r'\b\d{3}-\d{2}-\d{4}\b',
+        "credit_card": r'\b(?:\d{4}[- ]?){3}\d{4}\b',
+        "routing_number": r'\b\d{9}\b',
+        "iban": r'\b[A-Za-z]{2}\d{2}[A-Za-z0-9]{11,30}\b',
+        # "swift_code": r'\b[A-Z]{4}[A-Z]{2}[A-Za-z0-9]{2}([A-Za-z0-9]{3})?\b',
+        # "currency": r'\b[\$€¥₹£]?\d{1,3}(,\d{3})*(\.\d{1,2})?\b',
+        "tin": r'\b\d{2}-\d{7}\b',
+        "pan": r'\b[A-Z]{5}\d{4}[A-Z]\b',
+        "gstin": r'\b\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z][Z][A-Z0-9]\b',
+        # "cheque_number": r'\b\d{6,9}\b',
+        "reference_number": r'\b[A-Z]{3,4}-\d{6,10}\b',
+        # "business_reg": r'\b[A-Z0-9]{7,15}\b',
+        # "sort_code": r'\b\d{9}\b',
+        "ip_address": r'\b\d{1,3}(?:\.\d{1,3}){3}\b',
+        "ipv4": r'\b\d{1,3}(?:\.\d{1,3}){3}\b',
+        "url": r'\bhttps?://[^\s]+\b',
+        "merchant_id": r'\b(M|C)-[A-Za-z0-9]{6,12}\b',
+        "nin": r'\b\d{11}\b',
+    }
+    # Save uploaded file temporarily
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        text = PDFExcelService.extract_text_from_pdf(tmp_path)
+        anonymized_text = PDFExcelService.anonymize_text(text, patterns)
+        # Send anonymized_text to Gemini LLM here
+        return {"anonymized_text": anonymized_text}
+    finally:
+        os.unlink(tmp_path)  # Clean up
