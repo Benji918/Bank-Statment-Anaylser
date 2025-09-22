@@ -40,19 +40,22 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
             if not statement:
                 raise ValidationError("Statement not found")
             
-            if statement.status != StatementStatus.UPLOADED:
-                raise ValidationError("Statement must be in uploaded status for analysis")
+            # if statement.status != StatementStatus.UPLOADED:
+            #     raise ValidationError("Statement must be in uploaded status for analysis")
             
 
-            from app.services.statement_service import statement_service
-            statement_service.update_processing_status(
-                db, statement_id, StatementStatus.PROCESSING
-            )
+            # from app.services.statement_service import statement_service
+            # statement_service.update_processing_status(
+            #     db, statement_id, StatementStatus.PROCESSING
+            # )
             
 
             pdf_content = await file_service.download_from_cloudinary(
                 statement.cloudinary_public_id
             )
+
+            self.log_operation("downloaded file from cloudinary", statement_id=statement_id, user_id=user_id)
+
 
 
             start_time = datetime.utcnow()
@@ -120,9 +123,9 @@ class AnalysisService(BaseService[Analysis, AnalysisCreate, dict]):
             db.add(statement)
             
 
-            statement_service.update_processing_status(
-                db, statement_id, StatementStatus.COMPLETED
-            )
+            # statement_service.update_processing_status(
+            #     db, statement_id, StatementStatus.COMPLETED
+            # )
             
             self.log_operation(
                 "create_analysis_process_time",

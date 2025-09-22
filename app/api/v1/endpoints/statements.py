@@ -18,7 +18,7 @@ from app.core.logging import get_logger
 import os
 import tempfile
 from app.services.pdf_service import PDFExcelService
-
+import io, re, fitz
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -310,7 +310,8 @@ async def analyze_statement(file: UploadFile = File(...)):
         "phone": r'\b(?:\+234|0)([789]\d{9})\b',
         "account_number": r'\b\d{10,20}\b',
         "address": r'\d+\s+\w+(?:\s+\w+)*\s+(Street|St|Avenue|Ave|Close|Rd|Road|Lane|Ln|Crescent|Cres)\b',
-        "name": r'\b[A-Z][a-z]+ [A-Z][a-z]+\b',
+         "name": r'\b(?:[A-Z][A-Za-z\'\.-]+(?:\s+[A-Z][A-Za-z\'\.-]+){1,3}'
+            r'|[A-Z]{2,}(?:\s+[A-Z]{2,}){1,3})\b',
         "bvn": r'\b\d{11}\b',
         "ssn": r'\b\d{3}-\d{2}-\d{4}\b',
         "credit_card": r'\b(?:\d{4}[- ]?){3}\d{4}\b',

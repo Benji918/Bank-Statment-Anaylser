@@ -270,6 +270,13 @@ class PDFExcelService(LoggerMixin):
             self.log_error(e, "extract_metadata")
             return {}
 
+    FINANCIAL_TERMS = {
+        "account balance", "closing balance", "opening balance", "posted date",
+        "value date", "description", "debit", "credit", "balance", "date",
+        "transaction date", "available balance", "ledger balance", "amount",
+        "deposit", "withdrawal", 'total withdrawals ', "transfer", "transaction", "currency", "statement",
+        "period", "account summary", "financial summary", "bank statement", "total"
+    }
 
     def extract_text_from_pdf(pdf_path):
         text = ""
@@ -292,6 +299,37 @@ class PDFExcelService(LoggerMixin):
         return digest.finalize().hex()[:16]
 
     @staticmethod
+    def is_financial_term(text: str) -> bool:
+        """
+        Check if text is a financial term that should not be redacted
+        """
+        # Check if it's a date pattern (dd/mm/yyyy, mm/dd/yyyy, etc.)
+        date_patterns = [
+            r'\b\d{1,2}/\d{1,2}/\d{2,4}\b',
+            r'\b\d{1,2}-\d{1,2}-\d{2,4}\b',
+            r'\b\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}\b',
+            r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}\b'
+        ]
+
+        for pattern in date_patterns:
+            if re.fullmatch(pattern, text, re.IGNORECASE):
+                return True
+
+        # Check if it's a currency amount
+        # currency_patterns = [
+        #     r'^[$\€\£\¥]?\s?\d{1,3}(,\d{3})*(\.\d{2})?$',
+        #     r'^\d{1,3}(,\d{3})*(\.\d{2})?\s?[$\€\£\¥]?$'
+        # ]
+        #
+        # for pattern in currency_patterns:
+        #     if re.fullmatch(pattern, text.replace(" ", "")):
+        #         return True
+
+        # Check against our financial terms list
+        normalized_text = text.lower().strip()
+        return normalized_text in PDFExcelService.FINANCIAL_TERMS
+
+    @staticmethod
     def anonymize_text(text: str, patterns: Dict[str, str]) -> str:
         # Compile all patterns once
         compiled_patterns = {
@@ -304,12 +342,13 @@ class PDFExcelService(LoggerMixin):
         for key, pattern in compiled_patterns.items():
             for match in pattern.finditer(text):
                 start, end = match.span()
-                matches.append((
-                    start,
-                    end,
-                    match.group(),
-                    key
-                ))
+                original_text = match.group()
+
+                # Skip financial terms and dates
+                if PDFExcelService.is_financial_term(original_text):
+                    continue
+
+                matches.append((start, end, original_text, key))
 
         # Sort matches by position in reverse order
         # This ensures replacements don't affect other matches' positions
